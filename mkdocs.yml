@@ -1,0 +1,56 @@
+site_name: Wealth OS Documentation
+site_description: Explainable, research-grade personal wealth operating system
+repo_name: wealth-os
+
+theme:
+  name: material
+  language: zh
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - 首页: index.md
+  - 愿景与架构:
+      - 愿景与边界: 00_vision.md
+      - 总体架构: 01_architecture.md
+      - 项目目录: 03_project_structure.md
+  - 核心系统:
+      - Data OS: 04_data_os.md
+      - Research & Factor OS: 05_research_factor_os.md
+      - Portfolio & Capital OS: 06_portfolio_capital_os.md
+      - Risk Management: 07_risk_management.md
+      - Backtest & Execution: 08_backtest_execution.md
+      - Validation & Governance: 09_validation_governance.md
+      - Decision Engine: 10_decision_engine.md
+      - Simulation & Forecasting: 11_simulation_forecasting.md
+  - 产品与平台:
+      - API Contracts: 12_api_contracts.md
+      - UI/UX: 13_ui_ux.md
+      - Security & Privacy: 14_security_privacy.md
+      - Observability & Operations: 15_observability_operations.md
+      - Deployment: 16_deployment.md
+  - 工程治理:
+      - 工程体系: 02_engineering_system.md
+      - 路线图: 17_roadmap.md
+      - 测试策略: 18_testing_strategy.md
+      - Git 治理: 19_git_governance.md
+      - 术语表: 20_glossary.md
+      - Codex 开发交接: 21_codex_handoff.md
+      - ADR: adr/README.md

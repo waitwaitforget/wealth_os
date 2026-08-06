@@ -1,0 +1,13 @@
+portfolio:
+  base_currency: CNY
+  initial_capital: 1000000
+  initial_deployment_ratio: 0.65
+  target_volatility: 0.10
+assets:
+  CSI300: {asset_class: equity_index, sleeve: core, currency: CNY, base_weight: 0.18}
+  HSI: {asset_class: equity_index, sleeve: core, currency: HKD, base_weight: 0.10}
+  SP500: {asset_class: equity_index, sleeve: core, currency: USD, base_weight: 0.25}
+  GOLD: {asset_class: gold, sleeve: core, currency: USD, base_weight: 0.07}
+  BOND: {asset_class: bond, sleeve: core, currency: CNY, base_weight: 0.15}
+  BTC: {asset_class: digital_asset, sleeve: alternative, currency: USD, base_weight: 0.02, max_weight: 0.03}
+  CASH_CNY: {asset_class: cash, sleeve: cash, currency: CNY, base_weight: 0.23, min_weight: 0.05}
