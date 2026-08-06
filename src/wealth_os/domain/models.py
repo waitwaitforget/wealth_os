@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Mapping
+from enum import StrEnum
 
 import pandas as pd
 
 
-class AssetClass(str, Enum):
+class AssetClass(StrEnum):
     EQUITY_INDEX = "equity_index"
     INDUSTRY = "industry"
     STOCK = "stock"
@@ -17,7 +17,7 @@ class AssetClass(str, Enum):
     CASH = "cash"
 
 
-class Sleeve(str, Enum):
+class Sleeve(StrEnum):
     CORE = "core"
     SATELLITE = "satellite"
     ALTERNATIVE = "alternative"

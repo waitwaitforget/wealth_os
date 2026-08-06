@@ -4,7 +4,9 @@ import numpy as np
 import pandas as pd
 
 
-def rolling_zscore(frame: pd.DataFrame, window: int, min_periods: int | None = None) -> pd.DataFrame:
+def rolling_zscore(
+    frame: pd.DataFrame, window: int, min_periods: int | None = None
+) -> pd.DataFrame:
     min_periods = min_periods or max(20, window // 3)
     mean = frame.rolling(window, min_periods=min_periods).mean()
     std = frame.rolling(window, min_periods=min_periods).std(ddof=0).replace(0.0, np.nan)

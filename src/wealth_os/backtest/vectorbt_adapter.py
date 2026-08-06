@@ -15,6 +15,7 @@ class VectorBTBacktestEngine:
         if importlib.util.find_spec("vectorbt") is None:
             raise RuntimeError("vectorbt is not installed; install wealth-os[vectorbt]")
         import vectorbt as vbt  # type: ignore
+
         self.vbt = vbt
 
     def run_from_orders(self, close, size, fees=0.0):

@@ -34,8 +34,20 @@ class NativeBacktestEngine:
         symbols = list(self.allocator.base_weights.index)
         risky_symbols = [s for s in symbols if s != self.cash_symbol]
         prices = prices.reindex(columns=risky_symbols)
-        external_cash_flows = (external_cash_flows if external_cash_flows is not None else pd.Series(0.0, index=prices.index)).reindex(prices.index).fillna(0.0)
-        cash_returns = (cash_returns if cash_returns is not None else pd.Series(0.0, index=prices.index)).reindex(prices.index).fillna(0.0)
+        external_cash_flows = (
+            (
+                external_cash_flows
+                if external_cash_flows is not None
+                else pd.Series(0.0, index=prices.index)
+            )
+            .reindex(prices.index)
+            .fillna(0.0)
+        )
+        cash_returns = (
+            (cash_returns if cash_returns is not None else pd.Series(0.0, index=prices.index))
+            .reindex(prices.index)
+            .fillna(0.0)
+        )
 
         index = prices.index
         shares = pd.Series(0.0, index=risky_symbols)
@@ -50,14 +62,13 @@ class NativeBacktestEngine:
         cost_records, turnover_records, flow_records = [], [], []
         order_rows: list[dict[str, object]] = []
         peak_nav = self.initial_capital
-        previous_nav_before_flow = self.initial_capital
 
         for step, date in enumerate(index):
             px = prices.loc[date]
             if step > 0:
                 cash *= 1.0 + float(cash_returns.loc[date])
 
-            pre_flow_nav = float((shares * px).sum() + cash)
+            float((shares * px).sum() + cash)
             flow = float(external_cash_flows.loc[date])
             if flow != 0:
                 units += flow / unit_nav
@@ -71,25 +82,41 @@ class NativeBacktestEngine:
                 actual.loc[risky_symbols] = shares * px / nav
                 actual.loc[self.cash_symbol] = cash / nav
 
-            signal_table = pd.DataFrame({
-                s: [value_scores.at[date, s] if s in value_scores.columns else 0.0,
-                    trend_scores.at[date, s] if s in trend_scores.columns else 0.0]
-                for s in symbols
-            }, index=["value", "trend"])
+            signal_table = pd.DataFrame(
+                {
+                    s: [
+                        value_scores.at[date, s] if s in value_scores.columns else 0.0,
+                        trend_scores.at[date, s] if s in trend_scores.columns else 0.0,
+                    ]
+                    for s in symbols
+                },
+                index=["value", "trend"],
+            )
             vol_today = volatility.loc[date].reindex(symbols).fillna(0.0)
             proposed = self.allocator.generate_target_weights(date, actual, signal_table, vol_today)
             proposed = apply_drawdown_overlay(proposed, self.cash_symbol, drawdown)
 
-            rolling_returns = prices.pct_change().iloc[max(0, step - 59):step + 1]
+            rolling_returns = prices.pct_change().iloc[max(0, step - 59) : step + 1]
             portfolio_vol = 0.0
             if len(rolling_returns) > 10:
                 aligned = actual.reindex(risky_symbols).fillna(0.0)
-                portfolio_vol = float((rolling_returns.fillna(0.0) @ aligned).std(ddof=0) * np.sqrt(252))
+                portfolio_vol = float(
+                    (rolling_returns.fillna(0.0) @ aligned).std(ddof=0) * np.sqrt(252)
+                )
 
-            composite = signal_table.loc["value"].fillna(0) * self.allocator.value_weight + signal_table.loc["trend"].fillna(0) * self.allocator.trend_weight
+            composite = (
+                signal_table.loc["value"].fillna(0) * self.allocator.value_weight
+                + signal_table.loc["trend"].fillna(0) * self.allocator.trend_weight
+            )
             decision = self.trigger_engine.evaluate(
-                date, actual, proposed, composite, portfolio_vol,
-                self.allocator.target_volatility, drawdown, flow,
+                date,
+                actual,
+                proposed,
+                composite,
+                portfolio_vol,
+                self.allocator.target_volatility,
+                drawdown,
+                flow,
             )
 
             day_cost = 0.0
@@ -116,7 +143,15 @@ class NativeBacktestEngine:
                     cash -= notional + cost
                     day_cost += cost
                     day_turnover += abs(notional)
-                    order_rows.append({"date": date, "symbol": symbol, "notional": notional, "cost": cost, "reason": ";".join(decision.reasons)})
+                    order_rows.append(
+                        {
+                            "date": date,
+                            "symbol": symbol,
+                            "notional": notional,
+                            "cost": cost,
+                            "reason": ";".join(decision.reasons),
+                        }
+                    )
 
                 buys = trades[trades > 0]
                 required = float(buys.sum())
@@ -132,7 +167,15 @@ class NativeBacktestEngine:
                     cash -= notional + cost
                     day_cost += cost
                     day_turnover += abs(notional)
-                    order_rows.append({"date": date, "symbol": symbol, "notional": notional, "cost": cost, "reason": ";".join(decision.reasons)})
+                    order_rows.append(
+                        {
+                            "date": date,
+                            "symbol": symbol,
+                            "notional": notional,
+                            "cost": cost,
+                            "reason": ";".join(decision.reasons),
+                        }
+                    )
                 target = proposed
 
             nav = float((shares * px).sum() + cash)
@@ -154,7 +197,6 @@ class NativeBacktestEngine:
             cost_records.append(day_cost)
             turnover_records.append(day_turnover / max(nav, 1e-12))
             flow_records.append(flow)
-            previous_nav_before_flow = pre_flow_nav
 
         orders = pd.DataFrame(order_rows)
         return BacktestResult(
@@ -169,5 +211,8 @@ class NativeBacktestEngine:
             transaction_costs=pd.Series(cost_records, index=index, name="transaction_cost"),
             turnover=pd.Series(turnover_records, index=index, name="turnover"),
             orders=orders,
-            diagnostics={"engine": "native", "initial_deployment_ratio": self.initial_deployment_ratio},
+            diagnostics={
+                "engine": "native",
+                "initial_deployment_ratio": self.initial_deployment_ratio,
+            },
         )

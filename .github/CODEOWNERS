@@ -1,0 +1,23 @@
+# CODEOWNERS
+
+# Engineering foundation
+Makefile         @owner
+pyproject.toml   @owner
+.python-version  @owner
+uv.lock          @owner
+.editorconfig    @owner
+.github/         @owner
+
+# Domain - immutable core, requires explicit review
+/src/wealth_os/domain/     @owner
+
+# High-risk: financial correctness
+/src/wealth_os/accounting/ @owner
+/src/wealth_os/risk/       @owner
+/src/wealth_os/validation/ @owner
+
+# High-risk: data timing and semantics
+/src/wealth_os/data/       @owner
+
+# Architecture decisions
+/docs/adr/                 @owner

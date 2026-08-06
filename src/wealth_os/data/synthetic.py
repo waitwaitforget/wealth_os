@@ -13,8 +13,12 @@ def make_synthetic_market(seed: int = 7, periods: int = 1500):
     shocks = rng.normal(annual_mu / 252, annual_sigma / np.sqrt(252), size=(periods, len(symbols)))
     prices = pd.DataFrame(100 * np.exp(np.cumsum(shocks, axis=0)), index=index, columns=symbols)
 
-    earnings_yield = pd.DataFrame(rng.normal(0.06, 0.015, size=prices.shape), index=index, columns=symbols)
-    dividend_yield = pd.DataFrame(rng.normal(0.025, 0.008, size=prices.shape), index=index, columns=symbols)
+    earnings_yield = pd.DataFrame(
+        rng.normal(0.06, 0.015, size=prices.shape), index=index, columns=symbols
+    )
+    dividend_yield = pd.DataFrame(
+        rng.normal(0.025, 0.008, size=prices.shape), index=index, columns=symbols
+    )
     # Non-cash-flow assets should not contribute valuation signals.
     earnings_yield[["GOLD", "BTC"]] = np.nan
     dividend_yield[["GOLD", "BTC"]] = np.nan
@@ -24,4 +28,9 @@ def make_synthetic_market(seed: int = 7, periods: int = 1500):
     contributions.loc[month_starts] = 20_000.0
     contributions.iloc[0] = 0.0
     cash_returns = pd.Series((1.02 ** (1 / 252) - 1), index=index)
-    return prices, {"earnings_yield": earnings_yield, "dividend_yield": dividend_yield}, contributions, cash_returns
+    return (
+        prices,
+        {"earnings_yield": earnings_yield, "dividend_yield": dividend_yield},
+        contributions,
+        cash_returns,
+    )

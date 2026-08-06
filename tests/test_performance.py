@@ -1,6 +1,10 @@
 import pandas as pd
 
-from wealth_os.analytics.performance import performance_summary, time_weighted_return, wealth_summary
+from wealth_os.analytics.performance import (
+    performance_summary,
+    time_weighted_return,
+    wealth_summary,
+)
 
 
 def test_wealth_summary_separates_contributions_from_profit() -> None:

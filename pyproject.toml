@@ -11,7 +11,9 @@ dependencies = [
     "numpy>=1.26",
     "pandas>=2.1",
     "pydantic>=2.0",
+    "pyyaml>=6.0",
     "scipy>=1.11",
+    "structlog>=24.0",
 ]
 
 [project.optional-dependencies]
@@ -77,6 +79,14 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "cvxpy.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "structlog.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "yaml.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

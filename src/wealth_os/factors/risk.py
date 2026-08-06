@@ -13,4 +13,6 @@ class VolatilityEstimator:
 
     def compute(self, prices: pd.DataFrame) -> pd.DataFrame:
         returns = prices.pct_change()
-        return returns.rolling(self.window, min_periods=max(20, self.window // 3)).std(ddof=0) * np.sqrt(self.annualization)
+        return returns.rolling(self.window, min_periods=max(20, self.window // 3)).std(
+            ddof=0
+        ) * np.sqrt(self.annualization)

@@ -1,0 +1,48 @@
+name: Bug Report
+description: File a bug report
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "0.1.0"
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - core
+        - data
+        - factors
+        - allocation
+        - backtest
+        - risk
+        - analytics
+        - validation
+        - infrastructure
+        - docs

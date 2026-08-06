@@ -19,7 +19,11 @@ class TrendFactor:
         for period, weight in zip(self.periods, self.weights, strict=True):
             momentum = prices.pct_change(period)
             scale = prices.pct_change().rolling(period).std(ddof=0) * np.sqrt(period)
-            score = score.add(momentum.div(scale.replace(0, np.nan)).clip(-3, 3).mul(weight), fill_value=0)
-        ma = prices.rolling(self.moving_average_window, min_periods=self.moving_average_window // 2).mean()
+            score = score.add(
+                momentum.div(scale.replace(0, np.nan)).clip(-3, 3).mul(weight), fill_value=0
+            )
+        ma = prices.rolling(
+            self.moving_average_window, min_periods=self.moving_average_window // 2
+        ).mean()
         ma_state = (prices / ma - 1.0).clip(-0.25, 0.25) * 4.0
         return score.add(ma_state.mul(0.20), fill_value=0).clip(-3, 3)

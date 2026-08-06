@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 import numpy as np
 import pandas as pd
 
-from wealth_os.domain.models import Instrument, PortfolioConstraints, Sleeve
+from wealth_os.domain.models import Instrument, PortfolioConstraints
 
 
 @dataclass
@@ -39,14 +39,18 @@ class VTRAllocationPolicy:
 
         composite = self.value_weight * value + self.trend_weight * trend
         multiplier = (1.0 + self.signal_strength * np.tanh(composite)).clip(0.20, 1.80)
-        multiplier = multiplier * ((1 - self.inverse_vol_weight) + self.inverse_vol_weight * inverse_vol)
+        multiplier = multiplier * (
+            (1 - self.inverse_vol_weight) + self.inverse_vol_weight * inverse_vol
+        )
 
         raw = self.base_weights * multiplier
         raw.loc[self.cash_symbol] = max(float(self.base_weights.get(self.cash_symbol, 0.0)), 0.0)
         raw = self._apply_bounds(raw)
 
         risky = raw.drop(self.cash_symbol, errors="ignore")
-        estimated_portfolio_vol = float(np.sqrt(np.nansum((risky * vol.reindex(risky.index).fillna(0.0)) ** 2)))
+        estimated_portfolio_vol = float(
+            np.sqrt(np.nansum((risky * vol.reindex(risky.index).fillna(0.0)) ** 2))
+        )
         if estimated_portfolio_vol > 0:
             scale = min(1.0, self.target_volatility / estimated_portfolio_vol)
             risky *= scale
@@ -80,7 +84,11 @@ class VTRAllocationPolicy:
                 cash_available = max(0.0, out.get(self.cash_symbol, 0.0))
                 add = min(deficit, cash_available)
                 base = self.base_weights.loc[members]
-                proportions = base / base.sum() if base.sum() > 0 else pd.Series(1 / len(members), index=members)
+                proportions = (
+                    base / base.sum()
+                    if base.sum() > 0
+                    else pd.Series(1 / len(members), index=members)
+                )
                 out.loc[members] += proportions * add
                 out.loc[self.cash_symbol] -= add
         return out

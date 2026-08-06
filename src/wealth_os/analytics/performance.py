@@ -40,7 +40,9 @@ def xirr(cash_flows: pd.Series, terminal_value: float, terminal_date: pd.Timesta
     t0 = signed.index.min()
 
     def npv(rate: float) -> float:
-        return float(sum(cf / ((1 + rate) ** ((date - t0).days / 365.0)) for date, cf in signed.items()))
+        return float(
+            sum(cf / ((1 + rate) ** ((date - t0).days / 365.0)) for date, cf in signed.items())
+        )
 
     try:
         return float(brentq(npv, -0.9999, 100.0))
@@ -102,10 +104,12 @@ def performance_summary(
     # Include the opening unit NAV so first-day PnL/costs are not discarded.
     if initial_unit_nav is not None:
         opening_index = clean.index[0] - pd.Timedelta(nanoseconds=1)
-        calculation_nav = pd.concat([
-            pd.Series([float(initial_unit_nav)], index=[opening_index]),
-            clean.astype(float),
-        ])
+        calculation_nav = pd.concat(
+            [
+                pd.Series([float(initial_unit_nav)], index=[opening_index]),
+                clean.astype(float),
+            ]
+        )
     else:
         calculation_nav = clean.astype(float)
 
@@ -118,11 +122,21 @@ def performance_summary(
     cagr = (1 + total) ** (1 / years) - 1 if years > 0 and total > -1 else float("nan")
     vol = float(returns.std(ddof=0) * math.sqrt(periods_per_year)) if len(returns) else 0.0
     downside = returns[returns < 0]
-    downside_vol = float(downside.std(ddof=0) * math.sqrt(periods_per_year)) if len(downside) else 0.0
+    downside_vol = (
+        float(downside.std(ddof=0) * math.sqrt(periods_per_year)) if len(downside) else 0.0
+    )
     dd = drawdown(calculation_nav)
     max_dd = float(dd.min())
-    sharpe = float(returns.mean() / returns.std(ddof=0) * math.sqrt(periods_per_year)) if returns.std(ddof=0) > 0 else float("nan")
-    sortino = float(returns.mean() * periods_per_year / downside_vol) if downside_vol > 0 else float("nan")
+    sharpe = (
+        float(returns.mean() / returns.std(ddof=0) * math.sqrt(periods_per_year))
+        if returns.std(ddof=0) > 0
+        else float("nan")
+    )
+    sortino = (
+        float(returns.mean() * periods_per_year / downside_vol)
+        if downside_vol > 0
+        else float("nan")
+    )
     calmar = float(cagr / abs(max_dd)) if max_dd < 0 and np.isfinite(cagr) else float("nan")
     return {
         "start_date": start_date,

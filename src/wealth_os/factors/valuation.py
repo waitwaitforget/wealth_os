@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 import pandas as pd
 
@@ -25,7 +25,9 @@ class ValuationFactor:
             if name not in metrics or weight == 0:
                 continue
             score = rolling_zscore(metrics[name], self.lookback)
-            total = score.mul(weight) if total is None else total.add(score.mul(weight), fill_value=0.0)
+            total = (
+                score.mul(weight) if total is None else total.add(score.mul(weight), fill_value=0.0)
+            )
             used_weight += abs(weight)
         if total is None or used_weight == 0:
             raise ValueError("No valuation metric matched configured weights")
