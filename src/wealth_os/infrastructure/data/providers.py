@@ -74,9 +74,7 @@ class AKShareProvider:
             return pd.DataFrame()
         return pd.DataFrame(frames).sort_index()
 
-    def _fetch_one(
-        self, symbol: str, start: date, end: date
-    ) -> pd.DataFrame | None:
+    def _fetch_one(self, symbol: str, start: date, end: date) -> pd.DataFrame | None:
         cache_key = self._cache_key(symbol, start, end)
         cache_path = self.cache_dir / f"{cache_key}.parquet"
         if cache_path.exists():
@@ -111,7 +109,7 @@ class AKShareProvider:
             except Exception as exc:
                 last_error = exc
                 if attempt < self.max_retries - 1:
-                    wait = 2 ** attempt
+                    wait = 2**attempt
                     time.sleep(wait)
         if last_error is not None:
             import warnings
@@ -129,14 +127,10 @@ class AKShareProvider:
             return ak.stock_hk_index_daily_sina(symbol=HK_SINA_SYMBOL_MAP[symbol])
         return None
 
-    def fetch_dividends(
-        self, symbols: list[str], start: date, end: date
-    ) -> list[CorporateAction]:
+    def fetch_dividends(self, symbols: list[str], start: date, end: date) -> list[CorporateAction]:
         return []
 
-    def fetch_splits(
-        self, symbols: list[str], start: date, end: date
-    ) -> list[CorporateAction]:
+    def fetch_splits(self, symbols: list[str], start: date, end: date) -> list[CorporateAction]:
         return []
 
     def _cache_key(self, symbol: str, start: date, end: date) -> str:
@@ -144,9 +138,7 @@ class AKShareProvider:
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
-def _normalize_index_data(
-    df: pd.DataFrame, start: date, end: date
-) -> pd.DataFrame | None:
+def _normalize_index_data(df: pd.DataFrame, start: date, end: date) -> pd.DataFrame | None:
     """Normalize AKShare index output to (date, close) DataFrame."""
     date_col = None
     for col in ["date", "日期", "trade_date", "datetime"]:

@@ -3,6 +3,7 @@
 Usage:
     python -m wealth_os.cli.data_quality <data_dir> [--output report.txt]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -15,12 +16,8 @@ from wealth_os.validation.data_checks import DataBundleValidator
 def main() -> None:
     parser = argparse.ArgumentParser(description="Data quality report CLI")
     parser.add_argument("data_dir", type=str, help="Path to data directory")
-    parser.add_argument(
-        "--output", "-o", type=str, default=None, help="Write report to file"
-    )
-    parser.add_argument(
-        "--since", type=str, default=None, help="Start date (YYYY-MM-DD)"
-    )
+    parser.add_argument("--output", "-o", type=str, default=None, help="Write report to file")
+    parser.add_argument("--since", type=str, default=None, help="Start date (YYYY-MM-DD)")
     args = parser.parse_args()
 
     repo = ParquetRepository(args.data_dir)

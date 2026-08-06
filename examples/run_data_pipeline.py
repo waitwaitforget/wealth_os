@@ -122,9 +122,7 @@ def main() -> None:
     data_source_label = "SYNTHETIC DEMO DATA (not real market performance)"
 
     if use_real:
-        symbols = [
-            s for s in DEFAULT_INSTRUMENTS if s != "CASH_CNY"
-        ]
+        symbols = [s for s in DEFAULT_INSTRUMENTS if s != "CASH_CNY"]
         real_prices = _try_fetch_real_data(data_dir, symbols)
         if real_prices is not None and not real_prices.empty:
             prices = real_prices
@@ -133,16 +131,12 @@ def main() -> None:
 
     if prices is None:
         prices, valuation_metrics, contributions, cash_returns = make_synthetic_market()
-        cash_returns = pd.Series(
-            cash_returns.values, index=prices.index, name="CASH_CNY"
-        )
-        contributions = pd.Series(
-            contributions.values, index=prices.index, name="contribution"
-        )
+        cash_returns = pd.Series(cash_returns.values, index=prices.index, name="CASH_CNY")
+        contributions = pd.Series(contributions.values, index=prices.index, name="contribution")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  DATA TYPE: {data_source_label}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # ---- Data health report ----
     bundle = MarketDataBundle(
@@ -191,21 +185,15 @@ def main() -> None:
 
     # ---- Factors ----
     valuation_metrics_placeholder = {
-        "earnings_yield": pd.DataFrame(
-            0.06, index=prices.index, columns=prices.columns
-        ),
-        "dividend_yield": pd.DataFrame(
-            0.025, index=prices.index, columns=prices.columns
-        ),
+        "earnings_yield": pd.DataFrame(0.06, index=prices.index, columns=prices.columns),
+        "dividend_yield": pd.DataFrame(0.025, index=prices.index, columns=prices.columns),
     }
     valuation = ValuationFactor(
         {"earnings_yield": 0.7, "dividend_yield": 0.3}, lookback=756
     ).compute(valuation_metrics_placeholder)
     valuation = valuation.reindex(columns=base.index).fillna(0.0)
     trend = TrendFactor().compute(prices).reindex(columns=base.index).fillna(0.0)
-    vol = (
-        VolatilityEstimator().compute(prices).reindex(columns=base.index).fillna(0.0)
-    )
+    vol = VolatilityEstimator().compute(prices).reindex(columns=base.index).fillna(0.0)
 
     # ---- Backtest ----
     allocator = VTRAllocationPolicy(instruments, base, constraints, cash_symbol)
@@ -213,19 +201,13 @@ def main() -> None:
     cash_ret_series = pd.Series((1.02 ** (1 / 252) - 1), index=prices.index)
     engine = NativeBacktestEngine(
         allocator=allocator,
-        trigger_engine=RebalanceTriggerEngine(
-            TriggerConfig(weight_drift={"BTC": 0.005})
-        ),
-        cost_model=TransactionCostModel(
-            TransactionCostConfig(sell_tax_bps=5.0, fx_bps=5.0)
-        ),
+        trigger_engine=RebalanceTriggerEngine(TriggerConfig(weight_drift={"BTC": 0.005})),
+        cost_model=TransactionCostModel(TransactionCostConfig(sell_tax_bps=5.0, fx_bps=5.0)),
         cash_symbol=cash_symbol,
         initial_capital=1_000_000,
         initial_deployment_ratio=0.65,
     )
-    result = engine.run(
-        prices, valuation, trend, vol, contributions_series, cash_ret_series
-    )
+    result = engine.run(prices, valuation, trend, vol, contributions_series, cash_ret_series)
 
     # ---- Validation ----
     issues = (
@@ -236,20 +218,14 @@ def main() -> None:
     print(ValidationReport(issues).summary())
 
     # ---- Performance ----
-    _wealth = wealth_summary(
-        result.nav, result.external_cash_flows, initial_capital=1_000_000
-    )
+    _wealth = wealth_summary(result.nav, result.external_cash_flows, initial_capital=1_000_000)
     performance = performance_summary(result.unit_nav, initial_unit_nav=1.0)
     investor_cash_flows = result.external_cash_flows.copy()
     investor_cash_flows.iloc[0] += 1_000_000
-    money_weighted_return = xirr(
-        investor_cash_flows, result.nav.iloc[-1], result.nav.index[-1]
-    )
+    money_weighted_return = xirr(investor_cash_flows, result.nav.iloc[-1], result.nav.index[-1])
 
     print(f"\n=== Backtest ({data_source_label}) ===")
-    print(
-        f"Period: {performance['start_date'].date()} → {performance['end_date'].date()}"
-    )
+    print(f"Period: {performance['start_date'].date()} → {performance['end_date'].date()}")
     print(f"TWR: {performance['twr']:.2%}")
     print(f"XIRR: {money_weighted_return:.2%}")
     print(

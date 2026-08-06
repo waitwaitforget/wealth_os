@@ -48,9 +48,7 @@ class DataBundleValidator:
 def _check_schema(prices: pd.DataFrame) -> list[DataQualityIssue]:
     issues: list[DataQualityIssue] = []
     if not isinstance(prices, pd.DataFrame):
-        issues.append(
-            DataQualityIssue(DataQualitySeverity.ERROR, "schema", "Not a DataFrame")
-        )
+        issues.append(DataQualityIssue(DataQualitySeverity.ERROR, "schema", "Not a DataFrame"))
         return issues
 
     if prices.empty:
@@ -59,9 +57,7 @@ def _check_schema(prices: pd.DataFrame) -> list[DataQualityIssue]:
         )
     if not isinstance(prices.index, pd.DatetimeIndex):
         issues.append(
-            DataQualityIssue(
-                DataQualitySeverity.ERROR, "schema", "Index is not DatetimeIndex"
-            )
+            DataQualityIssue(DataQualitySeverity.ERROR, "schema", "Index is not DatetimeIndex")
         )
     if prices.columns.duplicated().any():
         dups = list(prices.columns[prices.columns.duplicated()])
@@ -227,9 +223,7 @@ def validate_no_future_leak(
     baseline = factor_fn(data.copy())
     corrupted = data.copy()
     corrupted.loc[corrupted.index > cutoff] = (
-        corrupted.loc[corrupted.index > cutoff]
-        .sample(frac=1.0, random_state=7)
-        .to_numpy()
+        corrupted.loc[corrupted.index > cutoff].sample(frac=1.0, random_state=7).to_numpy()
     )
     rerun = factor_fn(corrupted)
     left = baseline.loc[:cutoff]
