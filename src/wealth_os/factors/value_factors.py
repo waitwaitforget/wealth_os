@@ -43,7 +43,7 @@ class PEEarningsYieldFactor:
 
     def compute(self, data: pd.DataFrame) -> pd.DataFrame:
         ey = 1.0 / data.replace(0, np.nan)
-        return rolling_zscore(ey.fillna(method="ffill"), self.lookback).clip(-3, 3)
+        return rolling_zscore(ey.ffill(), self.lookback).clip(-3, 3)
 
 
 @FactorRegistry.register(name="pb_inverse")
@@ -69,7 +69,7 @@ class PBInverseFactor:
 
     def compute(self, data: pd.DataFrame) -> pd.DataFrame:
         bp = 1.0 / data.replace(0, np.nan)
-        return rolling_zscore(bp.fillna(method="ffill"), self.lookback).clip(-3, 3)
+        return rolling_zscore(bp.ffill(), self.lookback).clip(-3, 3)
 
 
 @FactorRegistry.register(name="dividend_yield")
@@ -94,7 +94,7 @@ class DividendYieldFactor:
         )
 
     def compute(self, data: pd.DataFrame) -> pd.DataFrame:
-        return rolling_zscore(data.fillna(method="ffill"), self.lookback).clip(-3, 3)
+        return rolling_zscore(data.ffill(), self.lookback).clip(-3, 3)
 
 
 @FactorRegistry.register(name="valuation_composite")
@@ -137,7 +137,7 @@ class ValuationCompositeFactor:
         for name, weight in self.weights.items():
             if name not in metrics or weight == 0:
                 continue
-            score = rolling_zscore(metrics[name].fillna(method="ffill"), self.lookback)
+            score = rolling_zscore(metrics[name].ffill(), self.lookback)
             total = (
                 score.mul(weight) if total is None else total.add(score.mul(weight), fill_value=0.0)
             )
