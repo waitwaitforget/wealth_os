@@ -70,7 +70,7 @@ env/
 .env.*.local
 
 # Data directories
-data/
+/data/
 
 # Jupyter Notebook
 .ipynb_checkpoints/
