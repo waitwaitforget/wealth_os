@@ -7,7 +7,7 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-from wealth_os.factors.common import rolling_zscore
+from wealth_os.factors.common import robust_cross_sectional_zscore, rolling_zscore
 from wealth_os.factors.protocol import (
     FactorCategory,
     FactorDirection,
@@ -183,3 +183,104 @@ class HistoricalPercentileFactor:
             rank = series.rolling(self.lookback, min_periods=60).rank(pct=True)
             result[col] = rank
         return result
+
+
+@FactorRegistry.register(name="cross_sectional_value")
+class CrossSectionalValueFactor:
+    """Cross-sectional valuation z-score: compare each asset's valuation
+    relative to peers at each point in time.
+
+    Uses robust median-MAD z-score for outlier resistance.
+    """
+
+    @property
+    def meta(self) -> FactorMeta:
+        return FactorMeta(
+            name="cross_sectional_value",
+            category=FactorCategory.VALUE,
+            description="Cross-sectional (peer-relative) valuation z-score",
+            version="0.1.0",
+            direction=FactorDirection.POSITIVE,
+            tags=["value", "cross_sectional", "relative_value"],
+            parameters={},
+            input_fields=["pe_ratio", "pb_ratio", "earnings_yield"],
+            output_range=(-3.0, 3.0),
+        )
+
+    def compute(self, data: pd.DataFrame) -> pd.DataFrame:
+        return robust_cross_sectional_zscore(data.dropna(how="all")).clip(-3, 3)
+
+
+@FactorRegistry.register(name="equity_risk_premium")
+class EquityRiskPremiumFactor:
+    """ERP = Earnings Yield - Risk-Free Rate.
+
+    Higher ERP means stocks are cheaper relative to bonds.  The
+    risk-free rate is provided as a separate DataFrame or Series.
+    """
+
+    def __init__(self, lookback: int = 756) -> None:
+        self.lookback = lookback
+
+    @property
+    def meta(self) -> FactorMeta:
+        return FactorMeta(
+            name="equity_risk_premium",
+            category=FactorCategory.VALUE,
+            description="Equity Risk Premium = earnings_yield - risk_free_rate, z-scored",
+            version="0.1.0",
+            direction=FactorDirection.POSITIVE,
+            tags=["value", "erp", "macro", "risk_premium"],
+            parameters={"lookback": self.lookback},
+            input_fields=["earnings_yield", "risk_free_rate"],
+            output_range=(-3.0, 3.0),
+        )
+
+    def compute(
+        self,
+        data: pd.DataFrame,
+        risk_free_rate: pd.Series | None = None,
+    ) -> pd.DataFrame:
+        """Compute ERP z-score.
+
+        Args:
+            data: DataFrame of earnings_yield per asset
+            risk_free_rate: Series of risk-free rate (e.g., 10Y bond yield)
+        """
+        if risk_free_rate is None:
+            risk_free_rate = pd.Series(0.025, index=data.index)
+        risk_free_aligned = risk_free_rate.reindex(data.index).ffill()
+        erp = data.sub(risk_free_aligned, axis=0)
+        return rolling_zscore(erp.ffill(), self.lookback).clip(-3, 3)
+
+
+@FactorRegistry.register(name="cape_approximation")
+class CAPEApproximationFactor:
+    """Approximate CAPE (Shiller PE) using long-term smoothing.
+
+    Uses a 5-year (1260-day) rolling average of earnings_yield to
+    approximate cyclically-adjusted earnings.  Not a true CAPE
+    (which uses 10-year real earnings) but provides a long-term
+    smoothed valuation signal.
+    """
+
+    def __init__(self, smoothing_window: int = 1260) -> None:
+        self.smoothing_window = smoothing_window
+
+    @property
+    def meta(self) -> FactorMeta:
+        return FactorMeta(
+            name="cape_approximation",
+            category=FactorCategory.VALUE,
+            description="Approximate CAPE via 5-year smoothed earnings yield, z-scored",
+            version="0.1.0",
+            direction=FactorDirection.POSITIVE,
+            tags=["value", "cape", "long_term", "cyclical"],
+            parameters={"smoothing_window": self.smoothing_window},
+            input_fields=["earnings_yield"],
+            output_range=(-3.0, 3.0),
+        )
+
+    def compute(self, data: pd.DataFrame) -> pd.DataFrame:
+        smoothed = data.ffill().rolling(self.smoothing_window, min_periods=252).mean()
+        return rolling_zscore(smoothed, self.smoothing_window).clip(-3, 3)

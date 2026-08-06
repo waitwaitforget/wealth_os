@@ -334,3 +334,216 @@ class TestParameterStability:
         diff = (v60 - v40).abs().max().max()
         # Different windows produce different volatilities, but not extreme
         assert diff < 0.5, f"Vol window change produced {diff:.3f} diff"
+
+
+# ============================================================
+# Monotonicity tests — factor output should move predictably
+# ============================================================
+
+
+class TestMonotonicity:
+    """Verify factor output direction matches declared direction."""
+
+    def test_pe_factor_cheaper_higher_score(self) -> None:
+        """Lower PE → cheaper → higher value score."""
+        n = 300
+        # Use varying PE to avoid constant-rolling → NaN
+        rng = np.random.RandomState(42)
+        pe_high = pd.DataFrame(
+            {"A": 30 + rng.standard_normal(n) * 0.5},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        pe_low = pd.DataFrame(
+            {"A": 10 + rng.standard_normal(n) * 0.5},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = PEEarningsYieldFactor(lookback=60)
+        score_high_pe = f.compute(pe_high)["A"].dropna().iloc[-1]
+        score_low_pe = f.compute(pe_low)["A"].dropna().iloc[-1]
+        assert score_low_pe > score_high_pe, (
+            f"Cheaper (PE≈10) scored {score_low_pe:.3f}, "
+            f"expensive (PE≈30) scored {score_high_pe:.3f}"
+        )
+
+    def test_momentum_up_higher_score(self) -> None:
+        """Rising prices → higher momentum score."""
+        n = 200
+        trend_up = pd.DataFrame(
+            {"A": 100 + np.linspace(0, 30, n)},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        trend_down = pd.DataFrame(
+            {"A": 130 - np.linspace(0, 30, n)},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = Momentum3MFactor()
+        up_score = f.compute(trend_up)["A"].dropna().iloc[-1]
+        down_score = f.compute(trend_down)["A"].dropna().iloc[-1]
+        assert up_score > down_score, (
+            f"Uptrend scored {up_score:.3f}, downtrend scored {down_score:.3f}"
+        )
+
+    def test_vol_factor_stable_lower_risk(self) -> None:
+        """Lower volatility → lower risk score."""
+        n = 200
+        rng = np.random.RandomState(42)
+        stable = pd.DataFrame(
+            {"A": 100 + rng.standard_normal(n).cumsum() * 0.1},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        volatile = pd.DataFrame(
+            {"A": 100 + rng.standard_normal(n).cumsum() * 0.5},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = Volatility60dFactor()
+        stable_vol = f.compute(stable)["A"].dropna().iloc[-1]
+        vol_vol = f.compute(volatile)["A"].dropna().iloc[-1]
+        assert stable_vol < vol_vol, f"Stable vol={stable_vol:.4f}, volatile vol={vol_vol:.4f}"
+
+    def test_dividend_factor_higher_yield_higher_score(self) -> None:
+        """Rising dividend yield → rising value score over time."""
+        n = 600
+        div_up = pd.DataFrame(
+            {"A": np.linspace(0.01, 0.05, n)},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = DividendYieldFactor(lookback=120)
+        up_scores = f.compute(div_up)["A"].dropna()
+        assert len(up_scores) > 0
+        assert up_scores.iloc[-1] > 1.5, (
+            f"Rising yield should end with positive z-score > 1.5, got {up_scores.iloc[-1]:.3f}"
+        )
+
+
+# ============================================================
+# Lagged input tests — factor should respond with correct delay
+# ============================================================
+
+
+class TestLaggedInput:
+    """Verify that lagging the input by k periods shifts output proportionally."""
+
+    def test_ma_signal_lag_shift(self) -> None:
+        """Shifting input forward shifts output forward (no lookahead)."""
+        n = 300
+        rng = np.random.RandomState(99)
+        prices = pd.DataFrame(
+            {"A": 100 + rng.standard_normal(n).cumsum()},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = MASignalFactor(window=100)
+        result = f.compute(prices)
+
+        # Lag input by 5 days
+        lagged = prices.shift(5).bfill()
+        result_lagged = f.compute(lagged)
+
+        # Same values should occur ~5 days later in lagged result
+        common = result.dropna().index.intersection(result_lagged.dropna().index[5:])
+        if len(common) > 10:
+            # The unstretched result at t should be close to the stretched result at t+5
+            diff = result.loc[common[:-5], "A"].values - result_lagged.loc[common[5:], "A"].values
+            avg_diff = abs(diff).mean()
+            assert avg_diff < 0.5, f"MA signal lag shift too large: avg diff {avg_diff:.3f}"
+
+
+# ============================================================
+# New factor tests — Ulcer, ES, MRC, MA slope, downside trend
+# ============================================================
+
+
+class TestNewFactors:
+    """Basic correctness tests for newly added factors."""
+
+    def test_ulcer_index_non_negative(self) -> None:
+        from wealth_os.factors.risk_factors import UlcerIndexFactor
+
+        n = 200
+        prices = pd.DataFrame(
+            {"A": np.random.RandomState(7).uniform(90, 110, n)},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = UlcerIndexFactor(window=100)
+        result = f.compute(prices)["A"].dropna()
+        assert (result >= 0).all()
+        assert result.iloc[-1] < 0.3, "Random walk should have moderate ulcer index"
+
+    def test_expected_shortfall_leq_var(self) -> None:
+        """ES should be ≤ VaR (more extreme/below VaR)."""
+        from wealth_os.factors.risk_factors import (
+            ExpectedShortfallFactor,
+            HistoricalVaRFactor,
+        )
+
+        n = 300
+        rng = np.random.RandomState(88)
+        prices = pd.DataFrame(
+            {"A": 100 + rng.standard_normal(n).cumsum()},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        es = ExpectedShortfallFactor(window=100).compute(prices)
+        var = HistoricalVaRFactor(window=100).compute(prices)
+
+        common = es["A"].dropna().index.intersection(var["A"].dropna().index)
+        assert (es.loc[common, "A"] <= var.loc[common, "A"] + 1e-6).all(), "ES should be ≤ VaR"
+
+    def test_ma_slope_up_trend(self) -> None:
+        from wealth_os.factors.trend_factors import MASlopeFactor
+
+        n = 400
+        prices = pd.DataFrame(
+            {"A": 100 + np.linspace(0, 40, n)},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = MASlopeFactor(ma_window=100, slope_window=20)
+        result = f.compute(prices)["A"].dropna()
+        assert result.iloc[-1] > 0, "Uptrend should produce positive MA slope"
+
+    def test_downside_trend_strength_bounds(self) -> None:
+        from wealth_os.factors.trend_factors import DownsideTrendStrengthFactor
+
+        n = 200
+        rng = np.random.RandomState(44)
+        prices = pd.DataFrame(
+            {"A": 100 + rng.standard_normal(n).cumsum()},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = DownsideTrendStrengthFactor(window=60)
+        result = f.compute(prices)["A"].dropna()
+        assert (result >= 0).all() and (result <= 1).all()
+
+    def test_mrc_non_negative(self) -> None:
+        from wealth_os.factors.risk_factors import MarginalRiskContributionFactor
+
+        n = 200
+        rng = np.random.RandomState(55)
+        prices = pd.DataFrame(
+            {
+                "A": 100 + rng.standard_normal(n).cumsum(),
+                "B": 100 + rng.standard_normal(n).cumsum() * 0.8,
+                "C": 100 + rng.standard_normal(n).cumsum() * 0.5,
+            },
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = MarginalRiskContributionFactor(window=60)
+        result = f.compute(prices).dropna(how="all")
+        if not result.empty:
+            vals = result.iloc[-1]
+            assert (vals >= 0).all()
+
+    def test_cross_sectional_value_direction(self) -> None:
+        from wealth_os.factors.value_factors import CrossSectionalValueFactor
+
+        n = 100
+        # Use earnings_yield as input (higher = cheaper)
+        data = pd.DataFrame(
+            {"A": np.linspace(0.10, 0.08, n), "B": np.linspace(0.03, 0.04, n)},
+            index=pd.date_range("2020-01-01", periods=n, freq="B"),
+        )
+        f = CrossSectionalValueFactor()
+        result = f.compute(data).dropna()
+        if not result.empty and "A" in result.columns and "B" in result.columns:
+            # Higher earnings_yield (A=0.10) → cheaper → should score higher
+            assert result["A"].iloc[-1] > result["B"].iloc[-1], (
+                "Cheaper asset (higher earnings yield) should score higher"
+            )

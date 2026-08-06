@@ -209,3 +209,74 @@ class TrendConsensusFactor(_BaseMomentum):
 
         ma = MASignalFactor(self.ma_window).compute(data)
         return score.add(ma.mul(0.15), fill_value=0).clip(-3, 3)
+
+
+@FactorRegistry.register(name="ma_slope")
+class MASlopeFactor:
+    """Moving average slope: rate of change of the MA over a short window.
+
+    Positive slope = uptrend, negative = downtrend.  Normalized by price.
+    """
+
+    def __init__(self, ma_window: int = 200, slope_window: int = 20) -> None:
+        self.ma_window = ma_window
+        self.slope_window = slope_window
+
+    @property
+    def meta(self) -> FactorMeta:
+        return FactorMeta(
+            name="ma_slope",
+            category=FactorCategory.TREND,
+            description="Slope (rate of change) of moving average, scaled to [-1, 1]",
+            version="0.1.0",
+            direction=FactorDirection.POSITIVE,
+            tags=["trend", "ma", "slope", "momentum"],
+            parameters={
+                "ma_window": self.ma_window,
+                "slope_window": self.slope_window,
+            },
+            output_range=(-1.0, 1.0),
+        )
+
+    def compute(self, data: pd.DataFrame) -> pd.DataFrame:
+        ma = data.rolling(self.ma_window, min_periods=self.ma_window // 2).mean()
+        slope = ma.diff(self.slope_window) / data.shift(self.slope_window)
+        return slope.clip(-0.05, 0.05).mul(20).clip(-1, 1)
+
+
+@FactorRegistry.register(name="downside_trend_strength")
+class DownsideTrendStrengthFactor:
+    """Measures the persistence and magnitude of downside price moves.
+
+    Computes the fraction of negative daily returns over a window,
+    weighted by return magnitude.  Higher = stronger downtrend.
+    """
+
+    def __init__(self, window: int = 60) -> None:
+        self.window = window
+
+    @property
+    def meta(self) -> FactorMeta:
+        return FactorMeta(
+            name="downside_trend_strength",
+            category=FactorCategory.TREND,
+            description="Weighted fraction of negative returns — measures downtrend persistence",
+            version="0.1.0",
+            direction=FactorDirection.NEGATIVE,
+            tags=["trend", "downside", "bearish"],
+            parameters={"window": self.window},
+            output_range=(0.0, 1.0),
+        )
+
+    def compute(self, data: pd.DataFrame) -> pd.DataFrame:
+        ret = data.pct_change()
+        neg_count = (ret < 0).astype(float).rolling(self.window, min_periods=10).sum()
+        total = ret.rolling(self.window, min_periods=10).count()
+        neg_ratio = neg_count / total.replace(0, 1)
+
+        neg_ret = ret.where(ret < 0, 0.0).abs()
+        sum_neg = neg_ret.rolling(self.window, min_periods=10).sum()
+        sum_abs = ret.abs().rolling(self.window, min_periods=10).sum()
+        intensity = sum_neg / sum_abs.replace(0, 1)
+
+        return (neg_ratio * 0.4 + intensity * 0.6).clip(0, 1)
