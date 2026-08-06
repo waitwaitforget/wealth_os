@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import date
 
 from wealth_os.infrastructure.data.repository import ParquetRepository
 from wealth_os.validation.data_checks import DataBundleValidator
@@ -33,8 +34,8 @@ def main() -> None:
         sys.exit(1)
 
     instrument_ids = [i.instrument_id for i in instruments]
-    start = args.since or "2000-01-01"
-    end = "2099-12-31"
+    start = date.fromisoformat(args.since) if args.since else date(2000, 1, 1)
+    end = date(2099, 12, 31)
     bundle = repo.load_bundle(instrument_ids, start=start, end=end, version=version)
 
     validator = DataBundleValidator()
