@@ -112,6 +112,73 @@ class ConstraintChecker:
     def is_feasible(self, weights: pd.Series) -> bool:
         return self.check(weights).passed
 
+    def apply(self, weights: pd.Series, current_weights: pd.Series | None = None) -> pd.Series:
+        """Enforce all constraints and return corrected weights.
+
+        Applies: asset bounds, sleeve bounds, turnover limit, leverage check,
+        cash normalization.
+        """
+        out = weights.copy().fillna(0.0)
+
+        # Asset-level bounds
+        for sym in out.index:
+            upper = self.constraints.max_weights.get(sym, 1.0)
+            lower = self.constraints.min_weights.get(sym, 0.0)
+            out.loc[sym] = max(lower, min(upper, out.loc[sym]))
+
+        # Sleeve bounds
+        for sleeve, (lower, upper) in self.constraints.sleeve_bounds.items():
+            members = [
+                s
+                for s in out.index
+                if self.instruments.get(s) and self.instruments[s].sleeve == sleeve
+            ]
+            if not members:
+                continue
+            total = float(out[members].sum())
+            if total > upper and total > 0:
+                out.loc[members] *= upper / total
+            elif total < lower:
+                deficit = lower - total
+                cash_syms = [s for s in out.index if "CASH" in s.upper()]
+                cash_avail = max(0.0, sum(out.get(s, 0.0) for s in cash_syms))
+                add = min(deficit, cash_avail)
+                if add > 0 and members:
+                    even_split = add / len(members)
+                    out.loc[members] += even_split
+                    for cs in cash_syms:
+                        if cs in out.index:
+                            deduction = even_split * len(members) / len(cash_syms)
+                            out.loc[cs] = max(0.0, out.get(cs, 0.0) - deduction)
+
+        # Turnover limit
+        if current_weights is not None and self.constraints.max_turnover < 1.0:
+            aligned = current_weights.reindex(out.index).fillna(0.0)
+            turnover = float((out - aligned).abs().sum() / 2.0)
+            if turnover > self.constraints.max_turnover and turnover > 0:
+                fraction = self.constraints.max_turnover / turnover
+                out = aligned + fraction * (out - aligned)
+
+        # No negative weights (long-only)
+        if not self.constraints.allow_leverage:
+            out = out.clip(lower=0.0)
+
+        # Normalize to 1.0 with cash as residual
+        non_cash = out[~out.index.str.upper().str.contains("CASH")]
+        cash_sym = next((s for s in out.index if "CASH" in s.upper()), None)
+        if cash_sym:
+            non_cash = non_cash.clip(lower=0.0)
+            if non_cash.sum() > 1.0:
+                non_cash /= non_cash.sum()
+            out.loc[non_cash.index] = non_cash
+            out.loc[cash_sym] = max(0.0, 1.0 - non_cash.sum())
+        else:
+            out = out.clip(lower=0.0)
+            if out.sum() > 0:
+                out /= out.sum()
+
+        return out
+
     # ── Individual checks ────────────────────────────────────────
 
     def _check_weight_sum(self, weights: pd.Series, result: ConstraintResult) -> None:

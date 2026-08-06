@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import ClassVar
 
 import pandas as pd
 
@@ -60,7 +61,7 @@ class RiskOverlayStateMachine:
 
     # ── Drawdown thresholds ───────────────────────────────────────
 
-    DD_THRESHOLDS: list[tuple[float, DrawdownState]] = [
+    DD_THRESHOLDS: ClassVar[list[tuple[float, DrawdownState]]] = [
         (-0.20, DrawdownState.CRITICAL),
         (-0.15, DrawdownState.SEVERE),
         (-0.10, DrawdownState.SIGNIFICANT),
@@ -68,7 +69,7 @@ class RiskOverlayStateMachine:
         (0.0, DrawdownState.NORMAL),
     ]
 
-    RISK_MULTIPLIERS: dict[DrawdownState, float] = {
+    RISK_MULTIPLIERS: ClassVar[dict[DrawdownState, float]] = {
         DrawdownState.NORMAL: 1.0,
         DrawdownState.NOTABLE: 0.85,
         DrawdownState.SIGNIFICANT: 0.70,
@@ -103,6 +104,7 @@ class RiskOverlayStateMachine:
             if drawdown <= threshold:
                 new_dd_state = state
                 break
+        self.drawdown_state = new_dd_state
 
         # Step 2: Check correlation spike
         if correlation is not None and correlation > 0.7:

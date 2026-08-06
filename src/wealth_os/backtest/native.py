@@ -9,7 +9,7 @@ from wealth_os.allocation.policy import VTRAllocationPolicy
 from wealth_os.allocation.triggers import RebalanceTriggerEngine
 from wealth_os.backtest.costs import TransactionCostModel
 from wealth_os.domain.models import BacktestResult
-from wealth_os.risk.overlays import apply_drawdown_overlay
+from wealth_os.portfolio.overlay import RiskOverlayStateMachine
 
 
 @dataclass
@@ -57,6 +57,8 @@ class NativeBacktestEngine:
         target = pd.Series(0.0, index=symbols)
         target.loc[self.cash_symbol] = 1.0
 
+        risk_overlay = RiskOverlayStateMachine(target_volatility=self.allocator.target_volatility)
+
         nav_records, unit_nav_records, unit_records, cash_records = [], [], [], []
         positions_records, actual_records, target_records = [], [], []
         cost_records, turnover_records, flow_records = [], [], []
@@ -94,7 +96,13 @@ class NativeBacktestEngine:
             )
             vol_today = volatility.loc[date].reindex(symbols).fillna(0.0)
             proposed = self.allocator.generate_target_weights(date, actual, signal_table, vol_today)
-            proposed = apply_drawdown_overlay(proposed, self.cash_symbol, drawdown)
+
+            # Risk overlay: scale risky assets based on drawdown state
+            risk_mult = risk_overlay.update(drawdown)
+            risky_proposed = proposed.drop(self.cash_symbol, errors="ignore")
+            risky_proposed *= risk_mult
+            proposed.loc[risky_proposed.index] = risky_proposed
+            proposed.loc[self.cash_symbol] = max(0.0, 1.0 - risky_proposed.sum())
 
             rolling_returns = prices.pct_change().iloc[max(0, step - 59) : step + 1]
             portfolio_vol = 0.0
@@ -214,5 +222,6 @@ class NativeBacktestEngine:
             diagnostics={
                 "engine": "native",
                 "initial_deployment_ratio": self.initial_deployment_ratio,
+                "risk_overlay": risk_overlay.summary(),
             },
         )
