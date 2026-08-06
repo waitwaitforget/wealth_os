@@ -70,10 +70,7 @@ env/
 .env.*.local
 
 # Data directories
-data/raw/
-data/canonical/
-data/features/
-data/artifacts/
+data/
 
 # Jupyter Notebook
 .ipynb_checkpoints/

@@ -34,7 +34,8 @@ def main() -> None:
 
     instrument_ids = [i.instrument_id for i in instruments]
     start = args.since or "2000-01-01"
-    bundle = repo.load_bundle(instrument_ids, start=start, version=version)
+    end = "2099-12-31"
+    bundle = repo.load_bundle(instrument_ids, start=start, end=end, version=version)
 
     validator = DataBundleValidator()
     report = validator.validate(bundle)
