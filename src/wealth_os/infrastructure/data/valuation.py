@@ -77,9 +77,7 @@ class ValuationProvider:
             "dividend_yield": dividends,
         }
 
-    def _fetch_earnings_yield(
-        self, symbol: str, start: date, end: date
-    ) -> pd.Series | None:
+    def _fetch_earnings_yield(self, symbol: str, start: date, end: date) -> pd.Series | None:
         idx_name = VALUATION_INDEX_MAP.get(symbol)
         if idx_name is None:
             return None
@@ -116,9 +114,7 @@ class ValuationProvider:
         result = df.loc[s:e, "earnings_yield"]  # type: ignore[index]
         return result.dropna() if not result.empty else None
 
-    def _fetch_dividend_yield(
-        self, symbol: str, start: date, end: date
-    ) -> pd.Series | None:
+    def _fetch_dividend_yield(self, symbol: str, start: date, end: date) -> pd.Series | None:
         # Try CSIndex for recent dividend yield
         csindex_code = {
             "CSI300": "000300",
@@ -140,9 +136,7 @@ class ValuationProvider:
                     if div_col:
                         df = df.copy()
                         df["日期"] = pd.to_datetime(df["日期"])
-                        recent_div = (
-                            pd.to_numeric(df[div_col].iloc[0], errors="coerce") / 100.0
-                        )
+                        recent_div = pd.to_numeric(df[div_col].iloc[0], errors="coerce") / 100.0
                         if pd.notna(recent_div) and recent_div > 0:
                             return pd.Series(
                                 recent_div,
