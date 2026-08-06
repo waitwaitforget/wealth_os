@@ -111,6 +111,7 @@ class FactorSpec:
     normalization: str
     missing_policy: str
 
+
 class FactorModel(Protocol):
     def compute(self, context: FactorContext) -> FactorResult: ...
 ```

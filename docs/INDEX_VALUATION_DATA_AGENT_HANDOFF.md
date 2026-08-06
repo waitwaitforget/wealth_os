@@ -609,15 +609,13 @@ class OfficialIndexDataProvider(Protocol):
         self,
         index_id: str,
         as_of_date: date,
-    ) -> IndexValuationSnapshot:
-        ...
+    ) -> IndexValuationSnapshot: ...
 
     def fetch_constituents(
         self,
         index_id: str,
         as_of_date: date,
-    ) -> list[IndexConstituent]:
-        ...
+    ) -> list[IndexConstituent]: ...
 ```
 
 ## 10.2 成分股财务 Provider
@@ -628,8 +626,7 @@ class FundamentalDataProvider(Protocol):
         self,
         instrument_ids: list[str],
         as_of_date: date,
-    ) -> list[FundamentalSnapshot]:
-        ...
+    ) -> list[FundamentalSnapshot]: ...
 ```
 
 ## 10.3 指数聚合器
@@ -644,8 +641,7 @@ class IndexFundamentalAggregator(Protocol):
         market_data: list[MarketSnapshot],
         fx_rates: list[FXRate],
         as_of_date: date,
-    ) -> IndexValuationSnapshot:
-        ...
+    ) -> IndexValuationSnapshot: ...
 ```
 
 ## 10.4 校验器
@@ -656,8 +652,7 @@ class IndexValuationValidator(Protocol):
         self,
         calculated: IndexValuationSnapshot,
         official: IndexValuationSnapshot | None,
-    ) -> IndexValuationQualityReport:
-        ...
+    ) -> IndexValuationQualityReport: ...
 ```
 
 ---

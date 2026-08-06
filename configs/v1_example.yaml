@@ -43,3 +43,26 @@ us_equity_research:
   prices: sharadar_sep
   fundamentals: sharadar_sf1
   audit: crsp_if_available
+
+gold_etf:
+  primary: tiingo
+  secondary: alpaca_sip
+  instruments:
+    - IAU
+    - GLD
+gold:
+  portfolio_instrument:
+    symbol: IAU
+    provider: tiingo
+
+  portfolio_validation:
+    symbol: GLD
+    provider: alpaca_sip
+
+  cny_benchmark:
+    symbol: Au99.99
+    provider: tushare
+
+  cny_official_reference:
+    symbol: SHAU
+    provider: shanghai_gold_exchange

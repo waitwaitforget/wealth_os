@@ -123,14 +123,18 @@ Opening positions + cash
 class MarketDataRepository(Protocol):
     def load(self, request: MarketDataRequest) -> MarketDataBundle: ...
 
+
 class FactorModel(Protocol):
     def compute(self, context: FactorContext) -> FactorResult: ...
+
 
 class AllocationPolicy(Protocol):
     def allocate(self, context: AllocationContext) -> TargetPortfolio: ...
 
+
 class BacktestEngine(Protocol):
     def run(self, request: BacktestRequest) -> BacktestResult: ...
+
 
 class ExecutionBroker(Protocol):
     def rebalance(self, plan: OrderPlan) -> ExecutionReport: ...
