@@ -11,3 +11,35 @@ assets:
   BOND: {asset_class: bond, sleeve: core, currency: CNY, base_weight: 0.15}
   BTC: {asset_class: digital_asset, sleeve: alternative, currency: USD, base_weight: 0.02, max_weight: 0.03}
   CASH_CNY: {asset_class: cash, sleeve: cash, currency: CNY, base_weight: 0.23, min_weight: 0.05}
+
+providers:
+  us_market:
+    primary:
+      name: tiingo
+      purpose:
+        - ETF日频行情
+        - 复权行情
+        - 分红
+        - 拆股
+
+    secondary:
+      name: alpaca
+      feed: sip
+      purpose:
+        - 最近7年行情对账
+        - 公司行为对账
+
+    tertiary:
+      name: alpha_vantage
+      purpose:
+        - 调整价格抽样校验
+
+    fallback:
+      name: stooq
+      purpose:
+        - 免费应急
+        - 指数序列校验
+us_equity_research:
+  prices: sharadar_sep
+  fundamentals: sharadar_sf1
+  audit: crsp_if_available

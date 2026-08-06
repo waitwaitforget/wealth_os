@@ -44,7 +44,8 @@ SYMBOL_TO_AKSHARE: dict[str, str] = {
     "HSTECH": "HSTECH",
 }
 
-YFINANCE_SYMBOLS = {"SP500", "NASDAQ100", "GOLD", "BTC"}
+TIINGO_SYMBOLS = {"SP500", "NASDAQ100", "GOLD"}
+YFINANCE_SYMBOLS = {"BTC"}
 
 
 def _fetch_akshare(symbols: list[str], start: date, end: date, data_dir: str) -> pd.DataFrame:
@@ -61,6 +62,16 @@ def _fetch_yfinance(symbols: list[str], start: date, end: date, data_dir: str) -
         from wealth_os.infrastructure.data.yfinance_provider import YahooFinanceProvider
 
         provider = YahooFinanceProvider(cache_dir=f"{data_dir}/raw")
+        return provider.fetch_bars(symbols, start, end)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _fetch_tiingo(symbols: list[str], start: date, end: date, data_dir: str) -> pd.DataFrame:
+    try:
+        from wealth_os.infrastructure.data.tiingo_provider import TiingoProvider
+
+        provider = TiingoProvider(cache_dir=f"{data_dir}/raw")
         return provider.fetch_bars(symbols, start, end)
     except Exception:
         return pd.DataFrame()
@@ -97,18 +108,20 @@ def main() -> None:
         print("No valid symbols to ingest.")
         sys.exit(1)
 
-    akshare_symbols = [s for s in valid if s not in YFINANCE_SYMBOLS]
+    akshare_symbols = [s for s in valid if s not in TIINGO_SYMBOLS and s not in YFINANCE_SYMBOLS]
+    tiingo_symbols = [s for s in valid if s in TIINGO_SYMBOLS]
     yf_symbols = [s for s in valid if s in YFINANCE_SYMBOLS]
     if args.skip_yfinance:
         yf_symbols = []
 
     print(f"Ingesting {len(valid)} symbols: {valid}")
     print(f"  AKShare: {akshare_symbols}")
+    print(f"  Tiingo: {tiingo_symbols}")
     print(f"  Yahoo Finance: {yf_symbols}")
     print(f"  Range: {start} → {end}")
     print()
 
-    # Step 1: Fetch from both providers
+    # Step 1: Fetch from all providers
     frames = []
 
     if akshare_symbols:
@@ -129,6 +142,25 @@ def main() -> None:
         else:
             for s in akshare_symbols:
                 print(f"  [AKShare] {s}: FAILED")
+
+    if tiingo_symbols:
+        prices_t = _fetch_tiingo(tiingo_symbols, start, end, args.data_dir)
+        if not prices_t.empty:
+            frames.append(prices_t)
+            for s in tiingo_symbols:
+                if s in prices_t.columns:
+                    col = prices_t[s].dropna()
+                    n = len(col)
+                    if n:
+                        print(
+                            f"  [Tiingo] {s}: {n} rows, "
+                            f"{col.index[0].date()} → {col.index[-1].date()}"
+                        )
+                else:
+                    print(f"  [Tiingo] {s}: MISSING (check TIINGO_API)")
+        else:
+            for s in tiingo_symbols:
+                print(f"  [Tiingo] {s}: FAILED (check TIINGO_API in .env)")
 
     if yf_symbols:
         prices_y = _fetch_yfinance(yf_symbols, start, end, args.data_dir)
