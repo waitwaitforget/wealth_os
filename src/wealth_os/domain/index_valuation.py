@@ -42,8 +42,11 @@ class IndexDefinition:
     currency: str
     base_date: date | None = None
     launch_date: date | None = None
+    methodology_version: str = ""
     rebalance_frequency: str = "semi-annual"
     source_url: str = ""
+    created_at: pd.Timestamp | None = None
+    updated_at: pd.Timestamp | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -65,6 +68,7 @@ class IndexValuationSnapshot:
     # Valuation
     pe_static: float | None = None
     pe_ttm: float | None = None
+    pe_forward: float | None = None
     pb: float | None = None
     ps_ttm: float | None = None
     dividend_yield: float | None = None
@@ -76,6 +80,7 @@ class IndexValuationSnapshot:
     revenue_growth: float | None = None
     earnings_growth: float | None = None
     net_margin: float | None = None
+    operating_margin: float | None = None
 
     # Structure
     market_cap: float | None = None
@@ -87,7 +92,9 @@ class IndexValuationSnapshot:
 
     # Metadata
     aggregation_method: AggregationMethod = AggregationMethod.DIRECT
+    methodology_version: str = ""
     confidence: ConfidenceTier | None = None
+    confidence_score: float | None = None  # 0.0–1.0
     source: str = ""
     source_data_version: str = ""
     effective_time: pd.Timestamp | None = None
@@ -120,7 +127,10 @@ class IndexConstituent:
     weight: float | None = None
     shares: float | None = None
     free_float_factor: float | None = None
+    currency: str = ""
     source: str = ""
+    ingestion_time: pd.Timestamp | None = None
+    revision: int = 0
 
 
 # ── Fundamental Snapshot ──────────────────────────────────────────
@@ -170,6 +180,8 @@ class IndexValuationQualityReport:
     valid_weight: float = 0.0
     missing_weight: float = 0.0
     negative_earnings_weight: float = 0.0
+    stale_financial_weight: float = 0.0
+    currency_conversion_missing_weight: float = 0.0
 
     official_pe: float | None = None
     calculated_pe: float | None = None
