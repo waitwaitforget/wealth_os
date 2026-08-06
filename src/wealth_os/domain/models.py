@@ -15,6 +15,7 @@ class AssetClass(StrEnum):
     GOLD = "gold"
     DIGITAL_ASSET = "digital_asset"
     CASH = "cash"
+    CURRENCY = "currency"
 
 
 class Sleeve(StrEnum):
