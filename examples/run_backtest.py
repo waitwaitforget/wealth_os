@@ -154,15 +154,37 @@ def main() -> None:
     prices_for_factor = prices[data_symbols].copy()
 
     if valuation_metrics is None:
-        valuation_metrics = {
-            "earnings_yield": pd.DataFrame(
-                0.06, index=prices_for_factor.index, columns=data_symbols
-            ),
-            "dividend_yield": pd.DataFrame(
-                0.025, index=prices_for_factor.index, columns=data_symbols
-            ),
-        }
-        print("\n[WARN] Valuation metrics unavailable — using synthetic constants.")
+        try:
+            from wealth_os.infrastructure.data.valuation import ValuationProvider
+
+            vp = ValuationProvider()
+            real_metrics = vp.fetch_valuation_metrics(
+                data_symbols,
+                start=prices_for_factor.index[0].date(),
+                end=prices_for_factor.index[-1].date(),
+            )
+            if real_metrics["earnings_yield"].empty:
+                raise ValueError("Empty valuation data")
+
+            valuation_metrics = {
+                "earnings_yield": real_metrics["earnings_yield"].reindex(
+                    index=prices_for_factor.index
+                ),
+                "dividend_yield": real_metrics["dividend_yield"].reindex(
+                    index=prices_for_factor.index
+                ),
+            }
+            print("\n[INFO] Using real valuation data from AKShare")
+        except Exception:
+            valuation_metrics = {
+                "earnings_yield": pd.DataFrame(
+                    0.06, index=prices_for_factor.index, columns=data_symbols
+                ),
+                "dividend_yield": pd.DataFrame(
+                    0.025, index=prices_for_factor.index, columns=data_symbols
+                ),
+            }
+            print("\n[WARN] Valuation metrics unavailable - using synthetic constants.")
 
     valuation = (
         ValuationFactor({"earnings_yield": 0.7, "dividend_yield": 0.3}, lookback=756)
