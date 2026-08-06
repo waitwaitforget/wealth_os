@@ -48,6 +48,7 @@ research = [
     "vectorbt>=0.26",
     "cvxpy>=1.4",
     "akshare>=1.18.82",
+    "yfinance>=1.5.2",
 ]
 
 [tool.hatch.build.targets.wheel]

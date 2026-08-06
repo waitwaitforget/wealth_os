@@ -6,12 +6,27 @@ from dataclasses import dataclass
 import pandas as pd
 
 from .common import rolling_zscore
+from .protocol import FactorCategory, FactorDirection, FactorMeta
 
 
 @dataclass(frozen=True)
 class ValuationFactor:
     weights: Mapping[str, float]
     lookback: int = 2520
+
+    @property
+    def meta(self) -> FactorMeta:
+        return FactorMeta(
+            name="valuation_legacy",
+            category=FactorCategory.VALUE,
+            description="Weighted composite valuation factor (legacy)",
+            version="0.1.0",
+            direction=FactorDirection.POSITIVE,
+            tags=["value", "composite", "legacy"],
+            parameters={"weights": dict(self.weights), "lookback": self.lookback},
+            input_fields=list(self.weights),
+            output_range=(-3.0, 3.0),
+        )
 
     def compute(self, metrics: Mapping[str, pd.DataFrame]) -> pd.DataFrame:
         """Higher output means cheaper/more attractive.

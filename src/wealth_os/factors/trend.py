@@ -5,12 +5,31 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from .protocol import FactorCategory, FactorDirection, FactorMeta
+
 
 @dataclass(frozen=True)
 class TrendFactor:
     periods: tuple[int, ...] = (63, 126, 252)
     weights: tuple[float, ...] = (0.25, 0.35, 0.40)
     moving_average_window: int = 200
+
+    @property
+    def meta(self) -> FactorMeta:
+        return FactorMeta(
+            name="trend_legacy",
+            category=FactorCategory.TREND,
+            description="Multi-period momentum + MA signal composite (legacy)",
+            version="0.1.0",
+            direction=FactorDirection.POSITIVE,
+            tags=["trend", "composite", "legacy"],
+            parameters={
+                "periods": list(self.periods),
+                "weights": list(self.weights),
+                "moving_average_window": self.moving_average_window,
+            },
+            output_range=(-3.0, 3.0),
+        )
 
     def compute(self, prices: pd.DataFrame) -> pd.DataFrame:
         if len(self.periods) != len(self.weights):

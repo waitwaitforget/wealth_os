@@ -1,7 +1,7 @@
 """Data ingestion CLI.
 
 Usage:
-    python -m wealth_os.cli.ingest --symbols CSI300,HSI --start 2020-01-01 --end 2024-12-31
+    python -m wealth_os.cli.ingest --symbols CSI300,SP500 --start 2020-01-01
     python -m wealth_os.cli.ingest --all --data-dir data
 """
 
@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import date
+
+import pandas as pd
 
 from wealth_os.domain.data_models import (
     AssetClass,
@@ -28,6 +30,7 @@ UNIVERSE: dict[str, tuple[str, str, str, str]] = {
     "HSCEI": ("HSCEI", "恒生国企", "equity_index", "HKEX"),
     "HSTECH": ("HSTECH", "恒生科技", "equity_index", "HKEX"),
     "SP500": ("SP500", "标普500", "equity_index", "NYSE"),
+    "NASDAQ100": ("NASDAQ100", "纳斯达克100", "equity_index", "NASDAQ"),
     "GOLD": ("GOLD", "黄金", "gold", "FX"),
     "BTC": ("BTC", "比特币", "digital_asset", "CRYPTO"),
 }
@@ -41,6 +44,27 @@ SYMBOL_TO_AKSHARE: dict[str, str] = {
     "HSTECH": "HSTECH",
 }
 
+YFINANCE_SYMBOLS = {"SP500", "NASDAQ100", "GOLD", "BTC"}
+
+
+def _fetch_akshare(symbols: list[str], start: date, end: date, data_dir: str) -> pd.DataFrame:
+    provider = AKShareProvider(cache_dir=f"{data_dir}/raw")
+    mapped = [SYMBOL_TO_AKSHARE.get(s, s) for s in symbols]
+    prices = provider.fetch_bars(mapped, start, end)
+
+    rename = {v: k for k, v in SYMBOL_TO_AKSHARE.items()}
+    return prices.rename(columns=lambda c: rename.get(c, c))
+
+
+def _fetch_yfinance(symbols: list[str], start: date, end: date, data_dir: str) -> pd.DataFrame:
+    try:
+        from wealth_os.infrastructure.data.yfinance_provider import YahooFinanceProvider
+
+        provider = YahooFinanceProvider(cache_dir=f"{data_dir}/raw")
+        return provider.fetch_bars(symbols, start, end)
+    except Exception:
+        return pd.DataFrame()
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ingest market data into Wealth OS")
@@ -49,7 +73,9 @@ def main() -> None:
     parser.add_argument("--all", action="store_true", help="Ingest all known symbols")
     parser.add_argument("--start", type=str, default="2018-01-01")
     parser.add_argument("--end", type=str, default="2024-12-31")
-    parser.add_argument("--dry-run", action="store_true", help="Fetch only, skip persist")
+    parser.add_argument(
+        "--skip-yfinance", action="store_true", help="Skip Yahoo Finance (slow/ratelimited)"
+    )
     args = parser.parse_args()
 
     start = date.fromisoformat(args.start)
@@ -71,39 +97,63 @@ def main() -> None:
         print("No valid symbols to ingest.")
         sys.exit(1)
 
+    akshare_symbols = [s for s in valid if s not in YFINANCE_SYMBOLS]
+    yf_symbols = [s for s in valid if s in YFINANCE_SYMBOLS]
+    if args.skip_yfinance:
+        yf_symbols = []
+
     print(f"Ingesting {len(valid)} symbols: {valid}")
-    print(f"Range: {start} → {end}")
-    print(f"Data dir: {args.data_dir}")
+    print(f"  AKShare: {akshare_symbols}")
+    print(f"  Yahoo Finance: {yf_symbols}")
+    print(f"  Range: {start} → {end}")
     print()
 
-    # Step 1: Fetch
-    provider = AKShareProvider(cache_dir=f"{args.data_dir}/raw")
-    akshare_symbols = [SYMBOL_TO_AKSHARE.get(s, s) for s in valid]
-    prices = provider.fetch_bars(akshare_symbols, start, end)
+    # Step 1: Fetch from both providers
+    frames = []
 
-    fetched = list(prices.columns) if not prices.empty else []
-    akshare_to_ws = {v: k for k, v in SYMBOL_TO_AKSHARE.items()}
+    if akshare_symbols:
+        prices_a = _fetch_akshare(akshare_symbols, start, end, args.data_dir)
+        if not prices_a.empty:
+            frames.append(prices_a)
+            for s in akshare_symbols:
+                if s in prices_a.columns:
+                    col = prices_a[s].dropna()
+                    n = len(col)
+                    if n:
+                        print(
+                            f"  [AKShare] {s}: {n} rows, "
+                            f"{col.index[0].date()} → {col.index[-1].date()}"
+                        )
+                else:
+                    print(f"  [AKShare] {s}: MISSING")
+        else:
+            for s in akshare_symbols:
+                print(f"  [AKShare] {s}: FAILED")
 
-    # Rename columns from AKShare symbol to Wealth OS symbol
-    rename_map = {}
-    for col in prices.columns:
-        rename_map[col] = akshare_to_ws.get(col, col)
-    prices = prices.rename(columns=rename_map)
-    fetched = [rename_map.get(c, c) for c in fetched]
+    if yf_symbols:
+        prices_y = _fetch_yfinance(yf_symbols, start, end, args.data_dir)
+        if not prices_y.empty:
+            frames.append(prices_y)
+            for s in yf_symbols:
+                if s in prices_y.columns:
+                    col = prices_y[s].dropna()
+                    n = len(col)
+                    if n:
+                        print(
+                            f"  [YFinance] {s}: {n} rows, "
+                            f"{col.index[0].date()} → {col.index[-1].date()}"
+                        )
+                else:
+                    print(f"  [YFinance] {s}: MISSING (ratelimited)")
+        else:
+            for s in yf_symbols:
+                print(f"  [YFinance] {s}: FAILED (ratelimited)")
 
-    missing = [s for s in valid if s not in fetched]
-
-    print(f"Fetched: {len(fetched)}/{len(valid)}")
-    for sym in fetched:
-        ws_sym = akshare_to_ws.get(sym, sym)
-        s = prices[sym].dropna()
-        print(f"  {ws_sym}: {len(s)} rows, {s.index[0].date()} → {s.index[-1].date()}")
-    if missing:
-        print(f"Missing: {missing}")
-
-    if prices.empty:
+    if not frames:
         print("No data fetched.")
         sys.exit(1)
+
+    prices = pd.concat(frames, axis=1).sort_index()
 
     # Step 2: Validate
     from wealth_os.domain.data_models import MarketDataBundle
@@ -114,20 +164,19 @@ def main() -> None:
     print(f"\n{report.summary()}")
 
     if report.error_count > 0:
-        print("Data quality errors found — aborting ingest.")
+        print("Data quality errors found - aborting ingest.")
         sys.exit(1)
 
     # Step 3: Save
     repo = ParquetRepository(root_dir=args.data_dir)
 
     instruments = []
-    for sym in fetched:
-        ws_sym = akshare_to_ws.get(sym, sym)
-        inst_id, name, ac, mkt = UNIVERSE[ws_sym]
+    for col in prices.columns:
+        inst_id, name, ac, mkt = UNIVERSE[col]
         instruments.append(
             InstrumentMaster(
                 instrument_id=inst_id,
-                symbol=sym,
+                symbol=col,
                 name=name,
                 asset_class=AssetClass(ac),
                 market=Market(mkt),
