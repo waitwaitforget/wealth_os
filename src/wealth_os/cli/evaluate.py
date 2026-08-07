@@ -23,6 +23,12 @@ from wealth_os.allocation.triggers import RebalanceTriggerEngine
 from wealth_os.analytics.extended_metrics import extended_metrics
 from wealth_os.analytics.performance import performance_summary
 from wealth_os.backtest.costs import TransactionCostModel
+from wealth_os.backtest.investor import (
+    compute_probabilities,
+    compute_starting_points,
+    compute_underwater_metrics,
+    simulate_investor,
+)
 from wealth_os.backtest.native import NativeBacktestEngine
 from wealth_os.domain.models import (
     AssetClass,
@@ -322,6 +328,37 @@ def main() -> None:
     print(f"  Strategy Status: {report.overall_status.value.upper()}")
     print(f"  Recommendation:  {report.recommendation}")
     print(f"{'=' * 70}")
+
+    # Investor Simulation
+    print("\n[6] Investor Simulation (monthly ¥50,000 contribution)...")
+    inv = simulate_investor(full_vtr_result.unit_nav.dropna(), initial_capital=1_000_000, monthly_contribution=50_000)
+    print(f"     Initial: ¥{inv.initial_capital:,.0f}")
+    print(f"     Total contributed: ¥{inv.total_contributed:,.0f}")
+    print(f"     Final wealth: ¥{inv.final_wealth:,.0f}")
+    print(f"     Investment profit: ¥{inv.investment_profit:,.0f}")
+    print(f"     XIRR: {inv.xirr_value:.2%}")
+    print(f"     Max Drawdown: {inv.max_drawdown:.2%}")
+    print(f"     Underwater ratio: {inv.underwater_ratio:.1%}")
+
+    uw = compute_underwater_metrics(full_vtr_result.unit_nav.dropna())
+    print("\n[7] Wealth Experience Metrics")
+    print(f"     Underwater ratio: {uw.underwater_ratio:.1%}")
+    print(f"     Longest underwater: {uw.longest_underwater_days} days")
+    print(f"     Avg recovery (DD>5%): {uw.avg_recovery_days_above_5pct:.0f} days")
+    print(f"     Avg recovery (DD>10%): {uw.avg_recovery_days_above_10pct:.0f} days")
+
+    sp = compute_starting_points(full_vtr_result.unit_nav.dropna(), holding_years=5, step_months=3)
+    print("\n[8] Multiple Starting Points (5Y holding, quarterly starts)")
+    print(f"     N start points: {sp.n_start_points}")
+    print(f"     Median CAGR: {sp.median_cagr:.2%}")
+    print(f"     P10-P90 range: {sp.p10_cagr:.2%} ~ {sp.p90_cagr:.2%}")
+    print(f"     Positive ratio: {sp.positive_ratio:.1%}")
+
+    prob = compute_probabilities(full_vtr_result.unit_nav.dropna())
+    print("\n[9] Probability Metrics")
+    print(f"     P(5Y return < 0): {prob.p_5y_negative:.1%}")
+    print(f"     P(MaxDD > 20%): {prob.p_max_dd_beyond_20pct:.1%}")
+    print(f"     P(Underperform SAA over 5Y): {prob.p_underperform_saa_5y:.1%}")
 
     # Comparison table
     print(
