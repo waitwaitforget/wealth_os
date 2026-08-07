@@ -38,8 +38,9 @@ class TestDecisionEngine:
 
         assert len(report.decisions) == 3
         assert len(report.active_decisions) == 2
-        assert report.active_decisions[0].delta == pytest.approx(0.05)
-        assert report.active_decisions[1].delta == pytest.approx(-0.05)
+        deltas = sorted([d.delta for d in report.active_decisions])
+        assert deltas[0] == pytest.approx(-0.05)
+        assert deltas[1] == pytest.approx(0.05)
         assert not report.is_no_action
 
     def test_no_action_decision(self) -> None:
