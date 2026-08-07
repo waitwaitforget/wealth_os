@@ -1,8 +1,19 @@
-.PHONY: setup lint lint-fix typecheck test coverage ci docs demo clean
+.PHONY: setup lint lint-fix typecheck test coverage ci docs demo clean api dashboard
 
 setup:
 	uv sync --all-groups
 	uv run pre-commit install
+
+# Backend
+api:
+	uv run uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Frontend
+dashboard:
+	cd apps/web && npm run dev
+
+dashboard-build:
+	cd apps/web && npm run build
 
 lint:
 	uv run ruff check src/ tests/
