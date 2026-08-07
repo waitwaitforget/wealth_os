@@ -63,18 +63,26 @@ class RiskOverlayStateMachine:
 
     DD_THRESHOLDS: ClassVar[list[tuple[float, DrawdownState]]] = [
         (-0.25, DrawdownState.CRITICAL),
-        (-0.18, DrawdownState.SEVERE),
-        (-0.12, DrawdownState.SIGNIFICANT),
-        (-0.08, DrawdownState.NOTABLE),
+        (-0.15, DrawdownState.SEVERE),
+        (-0.10, DrawdownState.SIGNIFICANT),
+        (-0.06, DrawdownState.NOTABLE),
         (0.0, DrawdownState.NORMAL),
     ]
 
     RISK_MULTIPLIERS: ClassVar[dict[DrawdownState, float]] = {
         DrawdownState.NORMAL: 1.0,
-        DrawdownState.NOTABLE: 0.85,
-        DrawdownState.SIGNIFICANT: 0.70,
-        DrawdownState.SEVERE: 0.50,
-        DrawdownState.CRITICAL: 0.20,
+        DrawdownState.NOTABLE: 0.75,
+        DrawdownState.SIGNIFICANT: 0.50,
+        DrawdownState.SEVERE: 0.25,
+        DrawdownState.CRITICAL: 0.05,
+    }
+
+    RISK_MULTIPLIERS: ClassVar[dict[DrawdownState, float]] = {
+        DrawdownState.NORMAL: 1.0,
+        DrawdownState.NOTABLE: 0.80,
+        DrawdownState.SIGNIFICANT: 0.55,
+        DrawdownState.SEVERE: 0.30,
+        DrawdownState.CRITICAL: 0.10,
     }
 
     # ── Update ────────────────────────────────────────────────────

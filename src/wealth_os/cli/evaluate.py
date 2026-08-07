@@ -60,12 +60,12 @@ from wealth_os.infrastructure.data.repository import ParquetRepository
 
 CASH_SYMBOL = "CASH_CNY"
 STRATEGIC_WEIGHTS = {
-    "CSI300": 0.20,
-    "HSI": 0.12,
-    "SP500": 0.28,
-    "NASDAQ100": 0.10,
-    "GOLD": 0.07,
-    CASH_SYMBOL: 0.23,
+    "CSI300": 0.05,
+    "HSI": 0.03,
+    "SP500": 0.22,
+    "NASDAQ100": 0.07,
+    "GOLD": 0.18,
+    CASH_SYMBOL: 0.45,
 }
 
 
@@ -128,10 +128,10 @@ def run_vtr_strategy(
     base = pd.Series(STRATEGIC_WEIGHTS).reindex(prices.columns).fillna(0)
     base = base / base.sum()
     constraints = PortfolioConstraints(
-        max_weights={"GOLD": 0.15, "NASDAQ100": 0.25},
-        min_weights={},  # No floor — allow full cash during drawdown
-        sleeve_bounds={Sleeve.CORE: (0.0, 0.90)},
-        max_turnover=0.30,  # Allow faster repositioning
+        max_weights={"GOLD": 0.20, "NASDAQ100": 0.15, "CSI300": 0.15, "HSI": 0.10},
+        min_weights={},
+        sleeve_bounds={Sleeve.CORE: (0.0, 0.80)},
+        max_turnover=0.30,
     )
 
     allocator = VTRAllocationPolicy(
@@ -143,7 +143,7 @@ def run_vtr_strategy(
         trend_weight=trend_weight,
         inverse_vol_weight=risk_weight,
         signal_strength=0.3,
-        target_volatility=0.10,
+        target_volatility=0.06,
     )
 
     trigger_config = TriggerConfig(weight_drift={"GOLD": 0.01})
