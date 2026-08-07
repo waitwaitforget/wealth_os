@@ -71,10 +71,10 @@ class RiskOverlayStateMachine:
 
     RISK_MULTIPLIERS: ClassVar[dict[DrawdownState, float]] = {
         DrawdownState.NORMAL: 1.0,
-        DrawdownState.NOTABLE: 0.85,
-        DrawdownState.SIGNIFICANT: 0.70,
-        DrawdownState.SEVERE: 0.50,
-        DrawdownState.CRITICAL: 0.30,
+        DrawdownState.NOTABLE: 0.70,
+        DrawdownState.SIGNIFICANT: 0.50,
+        DrawdownState.SEVERE: 0.30,
+        DrawdownState.CRITICAL: 0.05,  # nearly all cash
     }
 
     # ── Update ────────────────────────────────────────────────────

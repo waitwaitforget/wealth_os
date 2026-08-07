@@ -129,9 +129,9 @@ def run_vtr_strategy(
     base = base / base.sum()
     constraints = PortfolioConstraints(
         max_weights={"GOLD": 0.15, "NASDAQ100": 0.25},
-        min_weights={CASH_SYMBOL: 0.05},
-        sleeve_bounds={Sleeve.CORE: (0.45, 0.90)},
-        max_turnover=0.20,
+        min_weights={},  # No floor — allow full cash during drawdown
+        sleeve_bounds={Sleeve.CORE: (0.0, 0.90)},
+        max_turnover=0.30,  # Allow faster repositioning
     )
 
     allocator = VTRAllocationPolicy(

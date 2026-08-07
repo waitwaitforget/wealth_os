@@ -102,7 +102,10 @@ class NativeBacktestEngine:
             risky_proposed = proposed.drop(self.cash_symbol, errors="ignore")
             risky_proposed *= risk_mult
             proposed.loc[risky_proposed.index] = risky_proposed
+            # Allow full cash during drawdown — no floor constraint
             proposed.loc[self.cash_symbol] = max(0.0, 1.0 - risky_proposed.sum())
+            # Ensure non-negative
+            proposed = proposed.clip(lower=0.0)
 
             rolling_returns = prices.pct_change().iloc[max(0, step - 59) : step + 1]
             portfolio_vol = 0.0
