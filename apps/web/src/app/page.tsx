@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, AreaChart, Area,
 } from "recharts";
 import { api } from "@/lib/api";
-import type { PortfolioSummary, Allocations, NavHistory, FactorSignals, RiskMetrics, DataHealth } from "@/lib/api";
+import type { PortfolioSummary, Allocations, NavHistory, FactorSignals, RiskMetrics, DataHealth, DecisionsResponse } from "@/lib/api";
 
 const COLORS = ["#3b82f6", "#8b5cf6", "#22c55e", "#f59e0b", "#ef4444", "#64748b"];
 const SLEEVE_COLORS: Record<string, string> = { CORE: "#3b82f6", SATELLITE: "#8b5cf6", ALTERNATIVE: "#f59e0b", CASH: "#64748b" };
@@ -154,7 +154,38 @@ function HealthCard({ health }: { health: DataHealth | null }) {
   );
 }
 
-// ── Card wrapper ──
+// ── Decisions Card ──
+function DecisionsCard({ decisions }: { decisions: DecisionsResponse | null }) {
+  if (!decisions) return <Card title="Latest Decision"><div className="text-[#64748b]">Loading...</div></Card>;
+  const { date, n_trades, is_no_action, confidence, est_cost_bps, trigger, trades } = decisions;
+  return (
+    <Card title={`Latest Decision — ${date}`}>
+      {is_no_action ? (
+        <div className="text-sm text-[#94a3b8]">
+          <span className="text-emerald-400 font-semibold">NO ACTION</span>
+          <p className="mt-1 text-xs text-[#64748b]">{trigger.join(", ")}</p>
+        </div>
+      ) : (
+        <div>
+          <div className="flex gap-4 text-xs text-[#64748b] mb-3">
+            <span>{n_trades} trades</span>
+            <span>Confidence: {(confidence * 100).toFixed(0)}%</span>
+            <span>Est cost: {est_cost_bps} bps</span>
+          </div>
+          <div className="space-y-1">
+            {trades.map(t => (
+              <div key={t.asset} className="flex justify-between text-sm items-center border-t border-[#1e293b] pt-1">
+                <span className="font-medium">{t.asset}</span>
+                <span className="font-mono text-xs text-[#64748b]">{t.current.toFixed(1)}% → {t.target.toFixed(1)}%</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded ${t.action === "buy" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>{t.action.toUpperCase()} {(t.delta * 100).toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="bg-[#111827] border border-[#1e293b] rounded-xl p-5 hover:border-[#334155] transition-colors">
@@ -171,6 +202,7 @@ export default function Dashboard() {
   const [factors, setFactors] = useState<FactorSignals | null>(null);
   const [risk, setRisk] = useState<RiskMetrics | null>(null);
   const [health, setHealth] = useState<DataHealth | null>(null);
+  const [decisions, setDecisions] = useState<DecisionsResponse | null>(null);
 
   useEffect(() => {
     api.portfolioSummary().then(setSummary).catch(console.error);
@@ -179,6 +211,7 @@ export default function Dashboard() {
     api.factorSignals().then(setFactors).catch(console.error);
     api.riskMetrics().then(setRisk).catch(console.error);
     api.dataHealth().then(setHealth).catch(console.error);
+    api.recentDecisions().then(setDecisions).catch(console.error);
   }, []);
 
   return (
@@ -189,6 +222,7 @@ export default function Dashboard() {
         <div className="lg:col-span-2 space-y-6">
           <AssetPie allocations={allocations} />
           <NavChart nav={nav} />
+          <DecisionsCard decisions={decisions} />
         </div>
         {/* Right: 1/3 */}
         <div className="space-y-6">

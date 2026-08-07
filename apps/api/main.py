@@ -20,6 +20,7 @@ from wealth_os.analytics.extended_metrics import extended_metrics, full_performa
 from wealth_os.analytics.performance import performance_summary
 from wealth_os.backtest.costs import TransactionCostModel
 from wealth_os.backtest.native import NativeBacktestEngine
+from wealth_os.decision.engine import generate_decision, generate_no_action_decision
 from wealth_os.domain.models import (
     AssetClass,
     Instrument,
@@ -228,6 +229,66 @@ async def risk_metrics() -> dict[str, Any]:
         "total_turnover": ext["total_turnover"],
         "cost_impact_pre_post": ext["cost_impact_on_twr"],
     }
+
+
+@app.get("/api/v1/decisions/recent")
+async def recent_decisions() -> dict[str, Any]:
+    result = _run_backtest()
+    if result is None:
+        return {"error": "No data available"}
+
+    try:
+        prices = _get_prices()
+        if prices is None:
+            return {"error": "No price data"}
+
+        last_date = result.nav.index[-1]
+        actual = result.actual_weights.iloc[-1]
+        target = result.target_weights.iloc[-1]
+        dd = float(result.nav.iloc[-1] / result.nav.expanding().max().iloc[-1] - 1)
+        risky = prices.drop(columns=[CASH_SYMBOL], errors="ignore")
+        trd_scores = TrendFactor().compute(risky).iloc[-1]
+        base = pd.Series({"CSI300": 0.20, "HSI": 0.12, "SP500": 0.28, "NASDAQ100": 0.10, "GOLD": 0.07, CASH_SYMBOL: 0.23})
+        vol_series = VolatilityEstimator().compute(risky).iloc[-1]
+
+        report = generate_decision(
+            date=last_date,
+            current_weights=actual,
+            target_weights=target,
+            value_scores=None,
+            trend_scores=trd_scores,
+            volatility=vol_series,
+            base_weights=base,
+            trigger_reasons=["daily update"],
+            portfolio_vol=float(result.nav.pct_change().std(ddof=0) * np.sqrt(252)),
+            drawdown=dd,
+            strategy_id="vtr_v1",
+        )
+
+        trades = []
+        for d in report.active_decisions:
+            trades.append({
+                "asset": d.asset,
+                "current": round(d.current_weight, 4),
+                "target": round(d.target_weight, 4),
+                "delta": round(d.delta, 4),
+                "action": d.action.value,
+                "priority": d.priority.value,
+                "confidence": round(d.confidence, 3),
+                "reasons": d.reasons,
+            })
+
+        return {
+            "date": str(last_date.date()),
+            "n_trades": len(report.active_decisions),
+            "is_no_action": report.is_no_action,
+            "confidence": round(report.overall_confidence, 3),
+            "trigger": report.trigger_reasons,
+            "est_cost_bps": round(report.total_estimated_cost_bps, 1),
+            "trades": trades,
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 @app.get("/api/v1/data/health")

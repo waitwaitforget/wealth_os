@@ -72,6 +72,27 @@ export interface DataHealth {
   assets: Record<string, AssetHealth>;
 }
 
+export interface DecisionTrade {
+  asset: string;
+  current: number;
+  target: number;
+  delta: number;
+  action: string;
+  priority: string;
+  confidence: number;
+  reasons: string[];
+}
+
+export interface DecisionsResponse {
+  date: string;
+  n_trades: number;
+  is_no_action: boolean;
+  confidence: number;
+  trigger: string[];
+  est_cost_bps: number;
+  trades: DecisionTrade[];
+}
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function fetchJSON<T>(path: string): Promise<T | null> {
@@ -92,4 +113,5 @@ export const api = {
   factorSignals: () => fetchJSON<FactorSignals>("/api/v1/factors/signals"),
   riskMetrics: () => fetchJSON<RiskMetrics>("/api/v1/risk/metrics"),
   dataHealth: () => fetchJSON<DataHealth>("/api/v1/data/health"),
+  recentDecisions: () => fetchJSON<DecisionsResponse>("/api/v1/decisions/recent"),
 };
