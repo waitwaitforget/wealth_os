@@ -72,12 +72,17 @@ export interface DataHealth {
   assets: Record<string, AssetHealth>;
 }
 
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-async function fetchJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
+async function fetchJSON<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+  } catch {
+    console.warn(`API unavailable at ${BASE_URL}${path}`);
+    return null;
+  }
 }
 
 export const api = {
