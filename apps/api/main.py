@@ -40,6 +40,20 @@ CASH_SYMBOL = "CASH_CNY"
 ASSETS = ["CSI300", "HSI", "SP500", "NASDAQ100", "GOLD", CASH_SYMBOL]
 DATA_DIR = "data"
 
+# ── Cache ──
+_cached_result: dict[str, Any] | None = None
+_cached_prices: pd.DataFrame | None = None
+
+
+def _get_prices() -> pd.DataFrame | None:
+    global _cached_prices
+    if _cached_prices is not None:
+        return _cached_prices
+    p = _load_prices()
+    if p is not None:
+        _cached_prices = p
+    return p
+
 
 def _get_instruments() -> dict[str, Instrument]:
     return {
@@ -60,47 +74,40 @@ def _load_prices() -> pd.DataFrame | None:
             return None
         ids = [i.instrument_id for i in instruments]
         loaded = repo.load_bars(ids, start=date(2018, 1, 1), end=date(2026, 8, 5))
+        if loaded.empty:
+            return None
         if CASH_SYMBOL not in loaded.columns:
             loaded[CASH_SYMBOL] = np.nan
-        return loaded[ASSETS]
+        available = [c for c in ASSETS if c in loaded.columns]
+        return loaded[available]
     except Exception:
         return None
 
 
-def _run_backtest() -> dict[str, Any] | None:
-    prices = _load_prices()
+def _run_backtest() -> Any:
+    global _cached_result
+    if _cached_result is not None:
+        return _cached_result
+
+    prices = _get_prices()
     if prices is None:
         return None
 
     instruments = _get_instruments()
     base = pd.Series({"CSI300": 0.20, "HSI": 0.12, "SP500": 0.28, "NASDAQ100": 0.10, "GOLD": 0.07, CASH_SYMBOL: 0.23})
-    constraints = PortfolioConstraints(
-        max_weights={"GOLD": 0.15, "NASDAQ100": 0.25},
-        min_weights={CASH_SYMBOL: 0.05},
-        sleeve_bounds={Sleeve.CORE: (0.45, 0.90)},
-        max_turnover=0.20,
-    )
+    constraints = PortfolioConstraints(max_weights={"GOLD": 0.15, "NASDAQ100": 0.25}, min_weights={CASH_SYMBOL: 0.05}, sleeve_bounds={Sleeve.CORE: (0.45, 0.90)}, max_turnover=0.20)
 
     risky = prices.drop(columns=[CASH_SYMBOL], errors="ignore")
     r1, r2 = np.random.RandomState(1), np.random.RandomState(2)
-    vm = {
-        "earnings_yield": pd.DataFrame(r1.uniform(-0.02, 0.02, size=risky.shape), index=risky.index, columns=risky.columns) + 0.06,
-        "dividend_yield": pd.DataFrame(r2.uniform(-0.005, 0.005, size=risky.shape), index=risky.index, columns=risky.columns) + 0.025,
-    }
+    vm = {"earnings_yield": pd.DataFrame(r1.uniform(-0.02, 0.02, size=risky.shape), index=risky.index, columns=risky.columns) + 0.06, "dividend_yield": pd.DataFrame(r2.uniform(-0.005, 0.005, size=risky.shape), index=risky.index, columns=risky.columns) + 0.025}
     val = ValuationFactor({"earnings_yield": 0.7, "dividend_yield": 0.3}, lookback=756).compute(vm).reindex(columns=prices.columns).fillna(0)
     trd = TrendFactor().compute(risky).reindex(columns=prices.columns).fillna(0)
     vol = VolatilityEstimator().compute(risky).reindex(columns=prices.columns).fillna(0)
 
     alloc = VTRAllocationPolicy(instruments, base, constraints, CASH_SYMBOL, value_weight=0.4, trend_weight=0.4, inverse_vol_weight=0.2, signal_strength=0.3, target_volatility=0.10)
-    engine = NativeBacktestEngine(
-        allocator=alloc,
-        trigger_engine=RebalanceTriggerEngine(TriggerConfig(weight_drift={"GOLD": 0.01})),
-        cost_model=TransactionCostModel(TransactionCostConfig(sell_tax_bps=3, fx_bps=3)),
-        cash_symbol=CASH_SYMBOL,
-        initial_capital=1_000_000,
-        initial_deployment_ratio=1.0,
-    )
+    engine = NativeBacktestEngine(allocator=alloc, trigger_engine=RebalanceTriggerEngine(TriggerConfig(weight_drift={"GOLD": 0.01})), cost_model=TransactionCostModel(TransactionCostConfig(sell_tax_bps=3, fx_bps=3)), cash_symbol=CASH_SYMBOL, initial_capital=1_000_000, initial_deployment_ratio=1.0)
     result = engine.run(prices, val, trd, vol, pd.Series(0, index=prices.index), pd.Series((1.02 ** (1 / 252) - 1), index=prices.index))
+    _cached_result = result
     return result
 
 
@@ -138,7 +145,7 @@ async def portfolio_allocations() -> dict[str, Any]:
 
     weights = result.actual_weights.iloc[-1]
     nav = float(result.nav.dropna().iloc[-1])
-    prices = _load_prices()
+    prices = _get_prices()
     latest_px = prices.iloc[-1] if prices is not None else pd.Series(dtype=float)
 
     assets = []
@@ -181,7 +188,7 @@ async def nav_history() -> dict[str, Any]:
 async def factor_signals(
     date_str: str = Query("latest", alias="date"),
 ) -> dict[str, Any]:
-    prices = _load_prices()
+    prices = _get_prices()
     if prices is None:
         return {"error": "No data available"}
 
@@ -231,20 +238,23 @@ async def data_health() -> dict[str, Any]:
         if not instruments:
             return {"status": "no_data", "assets": {}}
 
-        prices = _load_prices()
+        prices = _get_prices()
         if prices is None:
             return {"status": "no_data"}
 
         health = {}
         for col in prices.columns:
             s = prices[col].dropna()
-            health[col] = {
-                "rows": len(s),
-                "start": str(s.index[0].date()),
-                "end": str(s.index[-1].date()),
-                "missing_pct": round(float(prices[col].isna().mean() * 100), 1),
-                "ok": prices[col].isna().mean() < 0.10,
-            }
+            if s.empty:
+                health[col] = {"rows": 0, "start": "N/A", "end": "N/A", "missing_pct": 100.0, "ok": False}
+            else:
+                health[col] = {
+                    "rows": len(s),
+                    "start": str(s.index[0].date()),
+                    "end": str(s.index[-1].date()),
+                    "missing_pct": round(float(prices[col].isna().mean() * 100), 1),
+                    "ok": bool(prices[col].isna().mean() < 0.10),
+                }
 
         version = repo.get_latest_version()
         return {
