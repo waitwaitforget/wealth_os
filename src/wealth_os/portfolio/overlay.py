@@ -49,10 +49,10 @@ class RiskOverlayStateMachine:
     overlay_state: RiskOverlayState = RiskOverlayState.FULL_RISK
 
     # Recovery parameters
-    recovery_step: float = 0.05  # risk multiplier increment per step
-    recovery_interval_days: int = 5  # days between recovery steps
-    recovery_cooldown: int = 0  # remaining cooldown days
-    recovery_trigger_dd: float = -0.03  # DD must be above this to start recovery
+    recovery_step: float = 0.10  # risk multiplier increment per step
+    recovery_interval_days: int = 5
+    recovery_cooldown: int = 0
+    recovery_trigger_dd: float = -0.03
 
     # History
     state_history: list[tuple[str, float]] = field(default_factory=list)
@@ -62,19 +62,19 @@ class RiskOverlayStateMachine:
     # ── Drawdown thresholds ───────────────────────────────────────
 
     DD_THRESHOLDS: ClassVar[list[tuple[float, DrawdownState]]] = [
-        (-0.20, DrawdownState.CRITICAL),
-        (-0.15, DrawdownState.SEVERE),
-        (-0.10, DrawdownState.SIGNIFICANT),
-        (-0.05, DrawdownState.NOTABLE),
+        (-0.25, DrawdownState.CRITICAL),
+        (-0.18, DrawdownState.SEVERE),
+        (-0.12, DrawdownState.SIGNIFICANT),
+        (-0.08, DrawdownState.NOTABLE),
         (0.0, DrawdownState.NORMAL),
     ]
 
     RISK_MULTIPLIERS: ClassVar[dict[DrawdownState, float]] = {
         DrawdownState.NORMAL: 1.0,
-        DrawdownState.NOTABLE: 0.70,
-        DrawdownState.SIGNIFICANT: 0.50,
-        DrawdownState.SEVERE: 0.30,
-        DrawdownState.CRITICAL: 0.05,  # nearly all cash
+        DrawdownState.NOTABLE: 0.85,
+        DrawdownState.SIGNIFICANT: 0.70,
+        DrawdownState.SEVERE: 0.50,
+        DrawdownState.CRITICAL: 0.20,
     }
 
     # ── Update ────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ class RiskOverlayStateMachine:
             self.overlay_state = RiskOverlayState.REDUCING
             target_mult = self.RISK_MULTIPLIERS[new_dd_state]
             self.current_risk_multiplier = min(self.current_risk_multiplier, target_mult)
-            self.recovery_cooldown = 20  # wait before recovering
+            self.recovery_cooldown = 10
         elif (
             new_dd_state == DrawdownState.NORMAL
             and self.overlay_state != RiskOverlayState.FULL_RISK
